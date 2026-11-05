@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>祥 × 睦</title>
+<meta name="description" content="丰川祥子 × 若叶睦 · 两分钟的 WebGL 同人动画短片（画面与配乐均实时生成）">
+<style>
+  :root {
+    --bg: #07070c;
+    --fg: #f1eef8;
+    --muted: #a9a5bb;
+    --accent-s: #8fb0ff;
+    --accent-m: #8ff0bf;
+    --panel: rgba(10, 10, 18, 0.62);
+    --line: rgba(255, 255, 255, 0.16);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg: #07070c; --fg: #f1eef8; --panel: rgba(10, 10, 18, 0.62); }
+  }
+  :root[data-theme="dark"] { --bg: #07070c; --fg: #f1eef8; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); overflow: hidden;
+    font-family: "SMSerif", "Noto Serif SC", "Source Han Serif SC", "Songti SC", serif; }
+  #wrap { position: fixed; inset: 0; display: grid; place-items: center; background: var(--bg); }
+  #stage { display: block; background: #000; }
+  #overlay { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 16px;
+    background: radial-gradient(ellipse at center, rgba(7,7,12,0.15), rgba(7,7,12,0.75)); transition: opacity .8s ease; }
+  #overlay.hidden { opacity: 0; pointer-events: none; }
+  .card { max-width: 560px; }
+  .kicker { letter-spacing: .5em; font-size: 13px; color: var(--muted); margin: 0 0 18px; }
+  h1 { margin: 0; font-weight: 600; font-size: clamp(44px, 9vw, 92px); letter-spacing: .12em; line-height: 1.1; }
+  h1 .s { color: var(--accent-s); text-shadow: 0 0 28px rgba(143,176,255,.55); }
+  h1 .m { color: var(--accent-m); text-shadow: 0 0 28px rgba(143,240,191,.5); }
+  h1 .x { font-size: .5em; vertical-align: .25em; margin: 0 .35em; color: var(--fg); opacity: .8; }
+  .sub { margin: 14px 0 30px; font-size: 15px; color: var(--muted); letter-spacing: .15em; }
+  #play { font: inherit; font-size: 17px; letter-spacing: .3em; color: var(--fg); background: rgba(255,255,255,0.06);
+    border: 1px solid var(--line); border-radius: 999px; padding: 14px 34px 14px 40px; cursor: pointer;
+    transition: background .3s, border-color .3s, transform .3s; }
+  #play:hover:not(:disabled) { background: rgba(255,255,255,0.13); border-color: rgba(255,255,255,.35); transform: translateY(-1px); }
+  #play:disabled { opacity: .45; cursor: progress; }
+  #status { margin-top: 18px; font-size: 13px; color: var(--muted); letter-spacing: .12em; min-height: 1.4em; }
+  #controls { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; gap: 14px;
+    padding: 14px 16px 16px; background: linear-gradient(transparent, rgba(0,0,0,.55)); transition: opacity .5s; }
+  #controls.idle { opacity: 0; }
+  #controls button { font: inherit; color: var(--fg); background: none; border: 0; cursor: pointer; font-size: 16px; width: 34px; height: 34px; border-radius: 50%; }
+  #controls button:hover { background: rgba(255,255,255,.1); }
+  #bar { flex: 1; height: 18px; display: flex; align-items: center; cursor: pointer; touch-action: none; }
+  #bar .track { width: 100%; height: 3px; background: rgba(255,255,255,.2); border-radius: 2px; overflow: hidden; }
+  #fill { height: 100%; width: 0; background: linear-gradient(90deg, var(--accent-s), var(--accent-m)); }
+  #time { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted); min-width: 92px; text-align: right; font-family: ui-monospace, Menlo, monospace; }
+  @media (max-width: 520px) { #time { min-width: 0; font-size: 11px; } .kicker { letter-spacing: .3em; } }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="stage" width="1280" height="720" aria-label="动画画面"></canvas>
+  <div id="overlay">
+    <div class="card">
+      <p class="kicker">WEBGL 同人动画短片</p>
+      <h1><span class="s">祥</span><span class="x">×</span><span class="m">睦</span></h1>
+      <p class="sub">雨停之后，春日依旧 · 2:03</p>
+      <button id="play" type="button">▶ 播放</button>
+      <div id="status"></div>
+    </div>
+  </div>
+  <div id="controls" class="idle">
+    <button id="toggle" type="button" aria-label="播放">▶</button>
+    <div id="bar" role="slider" aria-label="进度"><div class="track"><div id="fill"></div></div></div>
+    <div id="time">0:00 / 2:03</div>
+    <button id="full" type="button" aria-label="全屏">⛶</button>
+  </div>
+</div>
+<script src="src/util.js"></script>
+<script src="src/fonts.js"></script>
+<script src="src/script.js"></script>
+<script src="src/gl.js"></script>
+<script src="src/shaders.js"></script>
+<script src="src/figures.js"></script>
+<script src="src/music.js"></script>
+<script src="src/scenes.js"></script>
+<script src="src/main.js"></script>
+</body>
+</html>
