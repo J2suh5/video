@@ -27,8 +27,9 @@ async function openPage() {
   const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
   const page = await browser.newPage({ viewport: { width: Math.min(W, 1920), height: Math.min(H, 1080) } });
   page.on('pageerror', (e) => console.error('[pageerror]', e.message));
-  await page.goto(`file://${root}/index.html?export=1&w=${W}&h=${H}`);
-  await page.waitForFunction(() => window.SMX_READY || window.SMX_ERROR, null, { timeout: 120000 });
+  page.setDefaultTimeout(0);
+  await page.goto(`file://${root}/index.html?export=1&w=${W}&h=${H}`, { waitUntil: 'domcontentloaded', timeout: 0 });
+  await page.waitForFunction(() => window.SMX_READY || window.SMX_ERROR, null, { timeout: 0, polling: 1000 });
   const err = await page.evaluate(() => window.SMX_ERROR);
   if (err) throw new Error(err);
   return { browser, page };
