@@ -74,7 +74,7 @@ const ff = spawnSync('ffmpeg', [
   '-y', '-framerate', String(FPS), '-start_number', String(first), '-i', path.join(frameDir, '%05d.jpg'),
   '-ss', String(FROM), '-t', String(TO - FROM), '-i', wavPath,
   '-frames:v', String(last - first),
-  '-c:v', 'libx264', '-preset', 'slow', '-crf', String(arg('crf', 20)), '-pix_fmt', 'yuv420p', '-tune', 'film',
+  '-c:v', 'libx264', '-preset', 'slow', '-crf', String(arg('crf', 24)), '-pix_fmt', 'yuv420p', '-tune', 'film',
   '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart', OUT,
 ], { stdio: 'inherit' });
 if (ff.status !== 0) process.exit(ff.status || 1);
