@@ -1,0 +1,2538 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<title>祥 · 睦</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="丰川祥子与若叶睦的四分钟 WebGL 同人动画短片，配乐在浏览器中实时合成。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,400;1,500&family=Noto+Serif+JP:wght@300;400&family=Noto+Serif+SC:wght@300;400;500;600&display=swap">
+<style>
+/* Layout: a full-bleed cinema screen; captions and controls live in the letterbox bars.
+   A single dark theme on purpose — this is a projection room, not a document. */
+:root {
+  --ink: #05060a;
+  --paper: #efe9df;
+  --mist: #9da3b8;
+  --saki: #b8caf2;
+  --mutsu: #c2e8ca;
+  --gilt: #e3c487;
+  --scrim: rgba(3, 4, 8, .62);
+  --display: "Noto Serif SC", "Noto Serif JP", "Songti SC", "STSong", "SimSun", serif;
+  --jp: "Noto Serif JP", "Noto Serif SC", "Hiragino Mincho ProN", serif;
+  --latin: "Cormorant Garamond", "Noto Serif SC", Georgia, serif;
+  --ui: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --u: 1;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { background: var(--ink); color: var(--paper); overflow: hidden; font-family: var(--ui); -webkit-font-smoothing: antialiased; }
+body.nocursor { cursor: none; }
+#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; background: var(--ink); }
+#stage-hit { position: fixed; inset: 0; z-index: 1; }
+
+/* captions */
+.subs { position: fixed; left: 0; right: 0; top: var(--subY, 92%); z-index: 2; pointer-events: none;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.sub { position: absolute; left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); top: 0;
+  text-align: center; text-wrap: balance; visibility: hidden; opacity: 0;
+  font: 400 max(15px, calc(var(--u) * 33px))/1.45 var(--display); letter-spacing: .08em; color: rgba(239, 233, 223, .94);
+  text-shadow: 0 0 calc(var(--u) * 16px) rgba(0, 0, 0, .95), 0 1px 2px rgba(0, 0, 0, .7); }
+.sub.s { color: var(--saki); }
+.sub.m { color: var(--mutsu); }
+
+/* chapter card */
+.card { position: fixed; left: var(--cardX, 8%); top: var(--cardY, 14%); z-index: 2; pointer-events: none; display: flex; align-items: stretch;
+  gap: calc(var(--u) * 26px); visibility: hidden; opacity: 0; --sp: 0; }
+.c-num { font: 300 max(34px, calc(var(--u) * 92px))/1 var(--display); color: var(--gilt); text-shadow: 0 0 calc(var(--u) * 30px) rgba(227, 196, 135, .45); }
+.c-body { display: flex; flex-direction: column; justify-content: center; gap: calc(var(--u) * 10px); padding-left: calc(var(--u) * 24px); border-left: 1px solid rgba(227, 196, 135, .45); }
+.c-title { font: 600 max(17px, calc(var(--u) * 38px))/1.1 var(--display); letter-spacing: calc(.36em + var(--sp) * .4em); text-shadow: 0 0 calc(var(--u) * 20px) rgba(0, 0, 0, .7); }
+.c-en { font: italic 500 max(12px, calc(var(--u) * 24px))/1 var(--latin); letter-spacing: .2em; color: var(--mist); text-transform: uppercase; }
+
+/* title */
+.title { position: fixed; left: 50%; top: var(--midY, 48%); transform: translate(-50%, -50%); z-index: 2; pointer-events: none; text-align: center;
+  visibility: hidden; opacity: 0; --sp: 0; width: max-content; max-width: calc(100% - 32px); }
+.t-main { font: 300 max(52px, calc(var(--u) * 168px))/1 var(--display); letter-spacing: calc(.18em + var(--sp) * .35em); white-space: nowrap;
+  text-shadow: 0 0 calc(var(--u) * 50px) rgba(160, 190, 255, .35); }
+.t-main .a { color: var(--saki); } .t-main .b { color: var(--mutsu); }
+.t-main i { font-style: normal; color: var(--gilt); margin: 0 .12em; font-weight: 300; }
+.t-jp { margin-top: calc(var(--u) * 34px); font: 300 max(14px, calc(var(--u) * 32px))/1.2 var(--jp); letter-spacing: .48em; color: rgba(239, 233, 223, .88); }
+.t-en { margin-top: calc(var(--u) * 18px); font: italic 400 max(13px, calc(var(--u) * 28px))/1 var(--latin); letter-spacing: .3em; color: var(--mist); }
+.title .t-fin { display: none; margin-top: calc(var(--u) * 30px); font: italic 500 max(14px, calc(var(--u) * 30px))/1 var(--latin); letter-spacing: .4em; color: var(--gilt); }
+.title.end .t-fin { display: block; }
+.credit { position: fixed; left: 0; right: 0; top: var(--subY, 92%); transform: translateY(-50%); z-index: 2; pointer-events: none; text-align: center; visibility: hidden; opacity: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  font: 400 max(12px, calc(var(--u) * 21px))/1.5 var(--display); letter-spacing: .14em; color: var(--mist); }
+
+/* start screen */
+.start { position: fixed; inset: 0; z-index: 5; display: grid; place-items: center; text-align: center;
+  padding-block: max(24px, env(safe-area-inset-top, 0px)) max(24px, env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: radial-gradient(ellipse at 50% 46%, rgba(5, 6, 10, .25), rgba(5, 6, 10, .82) 72%); }
+.s-inner { display: flex; flex-direction: column; align-items: center; gap: 14px; max-width: 34rem; }
+.s-eyebrow { font: 500 12px/1.4 var(--ui); letter-spacing: .32em; color: var(--mist); text-transform: uppercase; }
+.s-title { margin: 6px 0 0; font: 300 clamp(64px, 14vw, 132px)/1 var(--display); letter-spacing: .2em; padding-left: .2em; text-shadow: 0 0 40px rgba(150, 180, 255, .35); }
+.s-title .a { color: var(--saki); } .s-title .b { color: var(--mutsu); } .s-title i { font-style: normal; color: var(--gilt); margin: 0 .08em; }
+.s-jp { margin: 0; font: 300 clamp(15px, 2.6vw, 20px)/1.4 var(--jp); letter-spacing: .42em; padding-left: .42em; color: rgba(239, 233, 223, .9); }
+.s-cast { margin: 6px 0 10px; font: 400 15px/1.6 var(--display); letter-spacing: .2em; color: var(--mist); }
+.s-cast .saki { color: var(--saki); } .s-cast .mutsu { color: var(--mutsu); }
+.s-play { display: inline-flex; align-items: center; gap: 14px; padding: 15px 34px 15px 28px; border: 1px solid rgba(239, 233, 223, .5); background: rgba(5, 6, 10, .45);
+  color: var(--paper); font: 500 16px/1 var(--display); letter-spacing: .4em; border-radius: 2px; cursor: pointer; transition: border-color .3s, background .3s; }
+.s-play svg { width: 14px; height: 14px; fill: currentColor; }
+.s-play:hover:not(:disabled) { border-color: var(--gilt); background: rgba(227, 196, 135, .1); }
+.s-play:focus-visible, .ui button:focus-visible, .track:focus-visible { outline: 2px solid var(--gilt); outline-offset: 3px; }
+.s-play:disabled { cursor: progress; opacity: .8; }
+.s-note { margin: 4px 0 0; font: 400 13px/1.7 var(--ui); color: var(--mist); max-width: 30em; }
+
+/* controls */
+.ui { position: fixed; left: 0; right: 0; bottom: 0; z-index: 4; display: flex; align-items: center; gap: 12px;
+  padding-block: 18px calc(12px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  background: linear-gradient(to top, rgba(0, 0, 0, .72), rgba(0, 0, 0, 0)); transition: opacity .5s; }
+body:not(.started) .ui { display: none; }
+.ui.hide { opacity: 0; pointer-events: none; }
+.ui button { flex: none; width: 36px; height: 36px; display: grid; place-items: center; background: none; border: 0; color: var(--paper); cursor: pointer; border-radius: 50%; padding: 0; }
+.ui button:hover { background: rgba(239, 233, 223, .1); }
+.ui svg { width: 20px; height: 20px; fill: currentColor; }
+#b-play .i-pause, #b-play.is-playing .i-play { display: none; }
+#b-play.is-playing .i-pause { display: block; }
+#b-mute .i-off, #b-mute.is-muted .i-on { display: none; }
+#b-mute.is-muted .i-off { display: block; }
+.ui-time { flex: none; font: 500 13px/1 var(--ui); font-variant-numeric: tabular-nums; color: rgba(239, 233, 223, .85); min-width: 6.4em; }
+.track { position: relative; flex: 1; min-width: 0; height: 28px; cursor: pointer; touch-action: none; }
+.track::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 2px; margin-top: -1px; background: rgba(239, 233, 223, .22); }
+.track-fill { position: absolute; left: 0; top: 50%; height: 2px; margin-top: -1px; background: linear-gradient(90deg, var(--saki), var(--mutsu)); width: 0; }
+.track-knob { position: absolute; top: 50%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; background: var(--paper); box-shadow: 0 0 10px rgba(255, 255, 255, .5); }
+.track-marks { position: absolute; inset: 0; }
+.mark { position: absolute; top: 50%; width: 14px !important; height: 14px !important; margin: -7px 0 0 -7px; background: none !important; border: 0; padding: 0; cursor: pointer; }
+.mark::before { content: ""; position: absolute; left: 6px; top: 3px; width: 2px; height: 8px; background: var(--gilt); opacity: .8; }
+.mark span { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); white-space: nowrap; font: 400 12px/1 var(--display); letter-spacing: .12em; color: var(--paper);
+  background: var(--scrim); padding: 6px 8px; border-radius: 2px; opacity: 0; pointer-events: none; transition: opacity .2s; }
+.mark:hover span, .mark:focus-visible span { opacity: 1; }
+@media (max-width: 560px) { .ui { gap: 6px; } .ui-time { min-width: 0; font-size: 12px; } .mark span { display: none; } }
+@media (prefers-reduced-motion: reduce) { .ui, .s-play, .mark span { transition: none; } }
+
+</style>
+<canvas id="gl" aria-label="动画画面：丰川祥子与若叶睦"></canvas>
+<div id="stage-hit" aria-hidden="true"></div>
+
+<div id="title" class="title" aria-hidden="true">
+  <div class="t-main"><span class="a">祥</span><i>·</i><span class="b">睦</span></div>
+  <div class="t-jp">夜が明けても、そばにいて</div>
+  <div class="t-en">Sakiko &amp; Mutsumi</div>
+  <div class="t-fin">— Fin —</div>
+</div>
+<div id="card" class="card" aria-hidden="true">
+  <div class="c-num"></div>
+  <div class="c-body"><div class="c-title"></div><div class="c-en"></div></div>
+</div>
+<div id="subs" class="subs" aria-live="polite"></div>
+<div id="credit" class="credit">同人短片 · 角色出自《BanG Dream! It's MyGO!!!!!》与《BanG Dream! Ave Mujica》 · 画面与配乐均为程序实时生成</div>
+
+<section id="start" class="start">
+  <div class="s-inner">
+    <div class="s-eyebrow">同人动画短片 · 4 分钟 · 原创配乐</div>
+    <h1 class="s-title"><span class="a">祥</span><i>·</i><span class="b">睦</span></h1>
+    <p class="s-jp">夜が明けても、そばにいて</p>
+    <p class="s-cast"><span class="saki">丰川祥子</span> × <span class="mutsu">若叶睦</span></p>
+    <button id="play-btn" class="s-play" type="button"><svg viewBox="0 0 14 14" aria-hidden="true"><path d="M2 1l11 6-11 6z"/></svg><span>开始放映</span></button>
+    <p id="s-note" class="s-note">建议戴上耳机、横屏全屏观看。空格键暂停，← → 快退快进。</p>
+  </div>
+</section>
+
+<div id="ui" class="ui">
+  <button id="b-play" type="button" aria-label="暂停">
+    <svg class="i-play" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 3l12 7-12 7z"/></svg>
+    <svg class="i-pause" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 3h3.5v14H5zM11.5 3H15v14h-3.5z"/></svg>
+  </button>
+  <div class="ui-time"><span id="t-cur">0:00</span> / 4:00</div>
+  <div id="track" class="track" role="slider" tabindex="0" aria-label="播放进度" aria-valuemin="0" aria-valuemax="240" aria-valuenow="0">
+    <div class="track-fill"></div><div class="track-knob"></div><div class="track-marks"></div>
+  </div>
+  <button id="b-mute" type="button" aria-label="静音">
+    <svg class="i-on" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 7h3l4-4v14l-4-4H3zM13 6.5a5 5 0 010 7l-1-1a3.6 3.6 0 000-5zM15.3 4.2a8.2 8.2 0 010 11.6l-1-1a6.8 6.8 0 000-9.6z"/></svg>
+    <svg class="i-off" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 7h3l4-4v14l-4-4H3zM12.5 7.5l1-1 2 2 2-2 1 1-2 2 2 2-1 1-2-2-2 2-1-1 2-2z"/></svg>
+  </button>
+  <button id="b-full" type="button" aria-label="全屏">
+    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 3h5v2H5v3H3zM12 3h5v5h-2V5h-3zM3 12h2v3h3v2H3zM15 12h2v5h-5v-2h3z"/></svg>
+  </button>
+</div>
+<script>
+(() => {
+'use strict';
+// =====================================================================
+//  AUDIO — an original score, synthesized in the browser (WebAudio)
+//  72 BPM, 4/4, 72 bars = 240 s.  D major → B minor → D minor → E major
+// =====================================================================
+const BPM = 72, BEAT = 60 / BPM, BAR = BEAT * 4;
+const tb = (bar, beat = 0) => (bar * 4 + beat) * BEAT;
+const NIX = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+function nm(s) {
+  const m = /^([A-G])([#b]?)(-?\d)$/.exec(s);
+  if (!m) throw new Error('bad note ' + s);
+  return NIX[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0) + (+m[3] + 1) * 12;
+}
+const mtof = m => 440 * Math.pow(2, (m - 69) / 12);
+const pcOf = s => (NIX[s[0]] + (s[1] === '#' ? 1 : s[1] === 'b' ? -1 : 0) + 12) % 12;
+const QUAL = {
+  '': [0, 4, 7], 'm': [0, 3, 7], '7': [0, 4, 7, 10], 'm7': [0, 3, 7, 10], 'maj7': [0, 4, 7, 11],
+  'sus4': [0, 5, 7], 'sus2': [0, 2, 7], 'add9': [0, 4, 7, 14], 'dim': [0, 3, 6], 'maj9': [0, 4, 7, 11, 14],
+};
+function chord(sym) {
+  const [main, sl] = sym.split('/');
+  const m = /^([A-G][#b]?)(.*)$/.exec(main);
+  const root = pcOf(m[1]), iv = QUAL[m[2]];
+  if (!iv) throw new Error('chord ' + sym);
+  return { root, bass: sl ? pcOf(sl) : root, pcs: iv.map(i => (root + i) % 12) };
+}
+const trc = (c, n) => ({ root: (c.root + n + 120) % 12, bass: (c.bass + n + 120) % 12, pcs: c.pcs.map(p => (p + n + 120) % 12) });
+const upTo = (pc, lo) => { let m = lo; while (((m % 12) + 12) % 12 !== pc) m++; return m; };
+
+function vLH(c) {             // spread left-hand voicing, 5 notes
+  const b = upTo(c.bass, 38);
+  const fifth = (c.root + 7) % 12;
+  const n1 = upTo(fifth, b + 3), n2 = upTo(c.root, n1 + 1), n3 = upTo(c.pcs[1], n2 + 1);
+  const n4 = upTo(c.pcs.length > 3 ? c.pcs[3] : fifth, n3 + 1);
+  return [b, n1, n2, n3, n4];
+}
+function vPad(c, lo = 52) { return c.pcs.slice(0, 4).map(pc => upTo(pc, lo)).sort((a, b) => a - b); }
+function vGtr(c) {
+  const b = upTo(c.bass, 40); const out = [b]; let cur = b;
+  for (const pc of [(c.root + 7) % 12, c.root, c.pcs[1], (c.root + 7) % 12, c.root]) { cur = upTo(pc, cur + 3); out.push(cur); }
+  return out;
+}
+function seq(str) {           // "A4:1 D5:.5 r:1 | ..." → notes with beat offsets
+  const out = []; let b = 0;
+  for (const tok of str.split(/\s+/)) {
+    if (!tok || tok === '|') continue;
+    const [n, d] = tok.split(':'); const dur = parseFloat(d);
+    if (n !== 'r') for (const x of n.split('+')) out.push({ o: b, m: nm(x), d: dur });
+    b += dur;
+  }
+  return out;
+}
+
+// ---- themes ----
+const THEME_A = 'A4:1 D5:1 E5:1 F#5:1 | E5:2 C#5:1 A4:1 | D5:1 C#5:.5 D5:.5 F#5:1.5 E5:.5 | D5:3 B4:1 | G4:1 B4:1 E5:1 D5:.5 E5:.5 | F#5:1.5 E5:.5 C#5:1 A4:1 | B4:1 D5:1 G5:1.5 F#5:.5 | E5:2 D5:2';
+const THEME_A4 = 'A4:1 D5:1 E5:1 F#5:1 | E5:2 C#5:1 A4:1 | D5:1 C#5:.5 D5:.5 F#5:1.5 E5:.5 | D5:3 B4:1';
+const CH_A = [['D'], ['A/C#'], ['Bm'], ['G'], ['Em7'], ['A'], ['Bm7', 'G'], ['A', 'D']];
+const THEME_B = 'B5:1.5 A5:.5 G5:1 F#5:1 | E5:1.5 F#5:.5 A5:2 | A5:1 F#5:1 C#5:1 E5:1 | D5:3 B4:1 | G5:1.5 F#5:.5 E5:1 B4:1 | C#5:1 E5:1 G5:1 A5:1 | F#5:2 E5:1 D5:1 | D5:4';
+const CH_B = [['G'], ['A'], ['F#m'], ['Bm'], ['Em'], ['A7'], ['D'], ['D']];
+const CODETTA = 'D6:.5 B5:.5 G5:.5 B5:.5 D6:1 r:1 | C#6:.5 A5:.5 E5:.5 A5:.5 C#6:1 r:1 | A5:.5 C#6:.5 F#5:1 B5:.5 D6:.5 F#6:1 | E6:1 D6:.5 B5:.5 C#6:1 A5:1';
+const CH_COD = [['G'], ['A'], ['F#m', 'Bm'], ['Em', 'A7']];
+const RAIN_MEL = 'F#5:2 D5:1 B4:1 | D5:3 r:1 | A4:1 D5:1 F#5:1 E5:1 | E5:2 C#5:1 r:1 | F#5:1.5 E5:.5 D5:1 B4:1 | G5:2 F#5:1 D5:1 | E5:2 G5:1 F#5:1 | F#5:2 E5:1 C#5:1 | B5:2 A5:1 F#5:1 | G5:2 D5:2 | E5:1 F#5:1 G5:1 E5:1 | F#5:4';
+const CH_RAIN = [['Bm'], ['G'], ['D'], ['A'], ['Bm'], ['G'], ['Em'], ['F#7'], ['Bm'], ['G'], ['Em'], ['F#']];
+const MASK_MEL = 'D5:1.5 E5:.5 F5:1 A5:1 | Bb5:2 A5:1 F5:1 | G5:1.5 F5:.5 E5:1 D5:1 | C#5:3 A4:1 | D5:1 F5:1 A5:1 D6:1 | D6:1.5 C6:.5 Bb5:1 A5:1 | G5:1 Bb5:1 A5:1 C#6:1 | A5:2 E5:1 C#5:1';
+const CH_MASK = [['Dm'], ['Bb'], ['Gm'], ['A'], ['Dm'], ['Bb'], ['Gm', 'A'], ['A7']];
+
+function buildScore() {
+  const E = [];
+  let seed = 11;
+  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+  const hum = (v, a = .08) => Math.max(.03, v * (1 + (rnd() - .5) * a));
+  const ev = (t, d, i, m, v, x) => E.push({ t: Math.max(0, t), d, i, m, v, x });
+  const mel = (bar, str, i, tr = 0, v = .6, leg = 1) => { for (const n of seq(str)) ev(tb(bar, n.o) + (rnd() - .5) * .012, n.d * BEAT * leg, i, n.m + tr, hum(v)); };
+  const each = (bar, list, tr, fn) => list.forEach((syms, k) => {
+    const per = 4 / syms.length;
+    syms.forEach((s, j) => fn(trc(chord(s), tr), tb(bar + k, j * per), per * BEAT, bar + k, j));
+  });
+  const arp8 = (c, t, d, v = .3) => {
+    const n = vLH(c), pat = [0, 1, 2, 3, 4, 3, 2, 1], steps = Math.round(d / (BEAT / 2));
+    for (let k = 0; k < steps; k++) { const tt = t + k * BEAT / 2; ev(tt, t + d - tt + .2, 'pno', n[pat[k % 8]], hum(v * (k % 4 === 0 ? 1.15 : .95))); }
+  };
+  const pad = (c, t, d, v = .15, lo = 52, x = {}) => ev(t, d, 'str', 0, v, Object.assign({ notes: vPad(c, lo) }, x));
+  const gpick = (c, t, d, v = .25) => {
+    const n = vGtr(c), pat = [0, 2, 3, 4, 1, 3, 4, 5], steps = Math.round(d / (BEAT / 2));
+    for (let k = 0; k < steps; k++) ev(t + k * BEAT / 2, 1.8, 'gtr', n[pat[k % 8] % n.length], hum(v * (k % 2 ? .82 : 1)));
+  };
+  const strum = (c, t, d, v = .25) => {
+    const n = vGtr(c);
+    for (const [b, dir, acc] of [[0, 1, 1], [1, 1, .8], [1.5, -1, .55], [2.5, -1, .6], [3, 1, .8], [3.5, -1, .55]]) {
+      if (b * BEAT >= d - 1e-3) continue;
+      const ns = dir > 0 ? n : [...n].reverse().slice(0, 4);
+      ns.forEach((m, k) => ev(t + b * BEAT + k * .012, 1.3, 'gtr', m, hum(v * acc * (dir > 0 ? 1 : .8))));
+    }
+  };
+  const bassL = (c, t, d, v = .45) => {
+    const r = upTo(c.bass, 33);
+    ev(t, Math.min(d, BEAT * 1.8), 'bass', r, hum(v));
+    if (d >= BEAT * 4 - 1e-3) { ev(t + BEAT * 2, BEAT * 1.4, 'bass', r + (rnd() < .5 ? 0 : 7), hum(v * .85)); ev(t + BEAT * 3.5, BEAT * .5, 'bass', r + 12, hum(v * .55)); }
+    else if (d >= BEAT * 2 - 1e-3) ev(t + BEAT * 1.5, BEAT * .5, 'bass', r + 7, hum(v * .6));
+  };
+  const drums = (b0, b1, lv = 1) => {
+    for (let b = b0; b < b1; b++) {
+      for (let k = 0; k < 4; k++) { const t = tb(b, k); if (k % 2 === 0) ev(t, .45, 'kick', 0, hum(.5 * lv)); else ev(t, .3, 'snare', 0, hum(.2 * lv)); }
+      for (let k = 0; k < 8; k++) ev(tb(b, k * .5), .06, 'hat', 0, hum((k % 2 ? .08 : .12) * lv));
+    }
+  };
+
+  // ── Prologue (bars 0–5): space, music box ─────────────────────────
+  ev(0, tb(2.2), 'str', 0, .12, { notes: [nm('D3'), nm('A3'), nm('E4'), nm('F#4')], atk: 5, cut: 1100 });
+  ev(0, tb(6), 'wind', 0, .5);
+  [['A5', 0, 1], ['F#6', 0, 3], ['E6', 1, 1], ['D6', 1, 2.5], ['A5', 1, 3.5]].forEach(([n, b, bt], k) => ev(tb(b, bt), 3, 'mbox', nm(n), .3 - k * .02));
+  ev(tb(2), 5, 'bell', nm('D6'), .22);
+  ev(tb(2), 5, 'bell', nm('A6'), .1);
+  mel(2, THEME_A4, 'mbox', 12, .48);
+  each(2, [['D'], ['A/C#'], ['Bm'], ['G']], 0, (c, t, d) => {
+    pad(c, t, d + .4, .13, 50, { atk: 2 });
+    ev(t, d + .6, 'pno', upTo(c.bass, 38), .26);
+    ev(t + BEAT * 2, d - BEAT * 2 + .6, 'pno', upTo((c.root + 7) % 12, 45), .17);
+  });
+
+  // ── I. Childhood (bars 6–17): piano theme, dusk ──────────────────
+  ev(tb(6), tb(18) - tb(6), 'crickets', 0, .16);
+  mel(6, THEME_A, 'pno', 0, .62);
+  each(6, CH_A, 0, (c, t, d) => arp8(c, t, d, .26));
+  each(10, CH_A.slice(4), 0, (c, t, d) => gpick(c, t, d, .14));
+  each(10, CH_A.slice(4), 0, (c, t, d) => pad(c, t, d + .3, .07, 55));
+  mel(14, CODETTA, 'mbox', 0, .42);
+  mel(14, CODETTA, 'pno', -12, .22);
+  each(14, CH_COD, 0, (c, t, d) => {
+    const n = vGtr(c);
+    for (let b = 0; b < d / BEAT - 1e-3; b++) { ev(t + b * BEAT, 1, 'gtr', n[b % 2 ? 3 : 0], hum(.2)); ev(t + b * BEAT + BEAT / 2, .8, 'gtr', n[4], hum(.13)); }
+    pad(c, t, d + .2, .09, 55);
+    ev(t, d + .3, 'pno', upTo(c.bass, 38), .22);
+  });
+
+  // ── II. Spring (bars 18–29): walk → stage ────────────────────────
+  mel(18, THEME_B, 'pno', 0, .6);
+  each(18, CH_B, 0, (c, t, d, bar) => {
+    strum(c, t, d, bar < 22 ? .13 : .18);
+    pad(c, t, d + .25, bar < 22 ? .08 : .13, 52);
+    if (bar >= 20) bassL(c, t, d, .4);
+    ev(t, d + .3, 'pno', upTo(c.bass, 38), .22);
+  });
+  ev(tb(23, 2), tb(24) - tb(23, 2), 'swell', 0, .2);
+  ev(tb(24), 3, 'crash', 0, .22);
+  drums(24, 29, 1);
+  for (let k = 0; k < 4; k++) ev(tb(29, k), .45, 'kick', 0, .45 - k * .08);
+  mel(26, THEME_A4, 'pno', 12, .5);
+  mel(26, THEME_A4, 'vln', 0, .3);
+  each(26, [['D'], ['A/C#'], ['Bm'], ['G']], 0, (c, t, d) => { strum(c, t, d, .18); pad(c, t, d + .25, .14, 52); bassL(c, t, d, .4); arp8(c, t, d, .17); });
+  ev(tb(29, 2), 4, 'crash', 0, .12);
+
+  // ── III. Rain (bars 30–41): B minor ──────────────────────────────
+  ev(tb(29, 3), tb(42) - tb(29, 3) + .4, 'rain', 0, .55);
+  ev(tb(31, 1), 6, 'thunderFar', 0, .25);
+  mel(30, RAIN_MEL, 'pno', 0, .5);
+  each(30, CH_RAIN, 0, (c, t, d, bar) => {
+    ev(t, d + .5, 'pno', upTo(c.bass, 35), .3);
+    const v = vPad(c, 57);
+    v.slice(0, 3).forEach((m, k) => ev(t + BEAT + k * .03, d - BEAT + .4, 'pno', m, .14));
+    ev(t, d + .4, 'cello', upTo(c.bass, 36), .2);
+    if (bar >= 36) gpick(c, t, d, .12);
+    if (bar >= 38) pad(c, t, d + .3, .09, 55);
+  });
+  ev(139.55, 6, 'thunder', 0, .75);
+
+  // ── IV. Masquerade (bars 42–49): D minor ─────────────────────────
+  each(42, CH_MASK, 0, (c, t, d, bar) => {
+    const r = upTo(c.root, 62), th = upTo(c.pcs[1], r), fi = upTo(c.pcs[2], th);
+    const arr = [r, th, fi, r + 12, th + 12, fi + 12, r + 24, fi + 12, th + 12, r + 12, fi, th];
+    const steps = Math.round(d / (BEAT / 4));
+    for (let k = 0; k < steps; k++) ev(t + k * BEAT / 4, .35, 'hpsi', arr[k % 12], hum(k % 4 === 0 ? .26 : .17));
+    ev(t, d + .15, 'organ', 0, .15, { notes: vPad(c, 50) });
+    ev(t, 2.2, 'timp', upTo(c.root, 38), .5);
+    if (bar >= 46) ev(t + BEAT * 2.5, 1.6, 'timp', upTo(c.root, 38), .32);
+    for (let k = 0; k < Math.round(d / (BEAT / 2)); k++) ev(t + k * BEAT / 2, BEAT / 2 * .85, 'cello', upTo(c.root, 38), hum(k % 2 ? .12 : .18));
+  });
+  mel(42, MASK_MEL, 'vln', 0, .36);
+  mel(46, MASK_MEL.split('|').slice(4).join('|'), 'vln', 12, .16);
+  ev(tb(49), BAR, 'swell', 0, .3);
+  ev(tb(50), 6, 'bell', nm('A6'), .28);
+  ev(tb(50), 6, 'bell', nm('E6'), .12);
+  ev(167.2, 3, 'shatter', 0, .65);
+  ev(167.2, 5, 'boom', 0, .45);
+
+  // ── V. Beneath the stars (bars 51–66): E major ───────────────────
+  ev(tb(50, 3), tb(67) - tb(50, 3), 'crickets', 0, .3);
+  ev(tb(50, 3), tb(67) - tb(50, 3), 'wind', 0, .25);
+  mel(51, THEME_A, 'pno', 2, .56);
+  each(51, CH_A, 2, (c, t, d, bar) => {
+    arp8(c, t, d, .21);
+    if (bar >= 53) gpick(c, t, d, .12);
+    if (bar >= 55) pad(c, t, d + .25, .09, 54);
+  });
+  ev(tb(58, 2), tb(59) - tb(58, 2), 'swell', 0, .2);
+  ev(tb(59), 3, 'crash', 0, .18);
+  mel(59, THEME_B, 'vln', 2, .36);
+  mel(59, THEME_B, 'pno', 14, .42);
+  each(59, CH_B, 2, (c, t, d, bar) => {
+    strum(c, t, d, .17); pad(c, t, d + .25, .16, 52); bassL(c, t, d, .4); arp8(c, t, d, .16);
+    if (bar >= 63) { const v = vPad(c, 76); for (let k = 0; k < 4; k++) ev(t + k * BEAT + BEAT / 2, 1.6, 'mbox', v[k % 3], .14); }
+  });
+  drums(61, 66, .8);
+  for (let b = 59; b < 61; b++) for (let k = 0; k < 4; k += 2) ev(tb(b, k), .45, 'kick', 0, .35);
+  ev(tb(67), 4, 'crash', 0, .13);
+
+  // ── Epilogue (bars 67–71): dawn ──────────────────────────────────
+  mel(67, 'B4:1 E5:1 F#5:1 G#5:1 | F#5:2 D#5:1 B4:1 | E5:1 D#5:.5 E5:.5 G#5:2', 'pno', 0, .5);
+  each(67, [['E'], ['B/D#'], ['C#m', 'A']], 0, (c, t, d) => { arp8(c, t, d, .19); pad(c, t, d + .3, .11, 54); });
+  ['E2', 'B2', 'E3', 'G#3', 'D#4', 'F#4', 'B4', 'E5'].forEach((n, k) => ev(tb(70) + k * .09, 9, 'pno', nm(n), .3 - k * .015));
+  ev(tb(70), tb(72) - tb(70) + 1.5, 'str', 0, .13, { notes: [nm('E3'), nm('B3'), nm('D#4'), nm('F#4'), nm('G#4')], atk: 2.5, rel: 3 });
+  ev(tb(70, 2), 4, 'mbox', nm('B6'), .18); ev(tb(71), 4, 'mbox', nm('E6'), .2); ev(tb(71, 2), 4, 'mbox', nm('G#6'), .13);
+
+  E.sort((a, b) => a.t - b.t);
+  return E;
+}
+
+// ---------------------------------------------------------------------
+//  Offline sample synthesis
+// ---------------------------------------------------------------------
+function normalize(a, peak) { let m = 0; for (let i = 0; i < a.length; i++) m = Math.max(m, Math.abs(a[i])); if (m > 0) { const k = peak / m; for (let i = 0; i < a.length; i++) a[i] *= k; } return a; }
+function fadeEdges(a, sr, atk = .002, rel = .04) { const A = Math.floor(sr * atk), F = Math.floor(sr * rel); for (let i = 0; i < A; i++) a[i] *= i / A; for (let i = 0; i < F; i++) a[a.length - 1 - i] *= i / F; return a; }
+function addPartial(out, sr, f, amp, tau, phase = 0, tauFast = 0, fastMix = 0) {
+  const w = 2 * Math.PI * f / sr, c2 = 2 * Math.cos(w);
+  let y1 = Math.sin(phase - w), y2 = Math.sin(phase - 2 * w);
+  const d = Math.exp(-1 / (tau * sr)), df = tauFast ? Math.exp(-1 / (tauFast * sr)) : 0;
+  let e = amp * (1 - fastMix), ef = amp * fastMix;
+  for (let n = 0; n < out.length; n++) {
+    const y = c2 * y1 - y2; y2 = y1; y1 = y;
+    out[n] += y * (e + ef); e *= d; ef *= df;
+    if ((n & 1023) === 0 && e + ef < 1e-5) break;
+  }
+}
+function synthPiano(sr, midi) {
+  const f0 = mtof(midi);
+  const dur = Math.max(1.6, Math.min(6.5, 6.5 * Math.pow(110 / f0, .5)));
+  const out = new Float32Array(Math.floor(sr * dur));
+  const B = .00007 * Math.pow(2, (midi - 48) / 16);
+  const nP = Math.max(3, Math.min(12, Math.floor(7000 / f0)));
+  const tb0 = 3.4 * Math.pow(262 / f0, .55);
+  for (let k = 1; k <= nP; k++) {
+    const fk = k * f0 * Math.sqrt(1 + B * k * k); if (fk > sr * .45) break;
+    const amp = Math.pow(k, -1.05) * (.5 + .5 * Math.abs(Math.sin(Math.PI * k * .135))) * (k === 2 ? .85 : 1);
+    const tau = Math.max(.2, tb0 / (1 + .5 * (k - 1))), tf = Math.max(.06, .35 * tb0 / k);
+    const det = fk * .0004;
+    addPartial(out, sr, fk - det, amp * .5, tau, k * .7, tf, .55);
+    addPartial(out, sr, fk + det, amp * .5, tau * .97, k * .7 + 1.1, tf, .55);
+  }
+  let lp = 0; const hn = Math.floor(sr * .015);
+  for (let n = 0; n < hn; n++) { lp += ((Math.random() * 2 - 1) - lp) * .3; out[n] += lp * .05 * Math.exp(-n / (sr * .003)); }
+  return fadeEdges(normalize(out, .55), sr, .0015, .08);
+}
+function synthMbox(sr, midi) {
+  const f0 = mtof(midi), out = new Float32Array(Math.floor(sr * 3));
+  addPartial(out, sr, f0, 1, 1.9);
+  addPartial(out, sr, f0 * 1.0013, .4, 1.6, 1);
+  addPartial(out, sr, f0 * 3.01, .07, .35);
+  addPartial(out, sr, f0 * 5.93, .1, .14);
+  for (let n = 0; n < sr * .002; n++) out[n] += (Math.random() * 2 - 1) * .15 * (1 - n / (sr * .002));
+  return fadeEdges(normalize(out, .5), sr, .0008, .1);
+}
+function synthBell(sr, midi) {
+  const f0 = mtof(midi), out = new Float32Array(Math.floor(sr * 5));
+  [[.5, .12, 3.5], [1, 1, 3.2], [1.002, .5, 2.9], [2.76, .42, 1.6], [5.4, .22, .8], [8.93, .1, .4]].forEach(([r, a, t], k) => addPartial(out, sr, f0 * r, a, t, k));
+  return fadeEdges(normalize(out, .5), sr, .001, .2);
+}
+function ks(sr, f, dur, o) {
+  const out = new Float32Array(Math.floor(sr * dur));
+  const P = sr / f; let L = Math.floor(P - .5); if (L < 2) L = 2;
+  const fr = P - .5 - L, C = (1 - fr) / (1 + fr);
+  const buf = new Float32Array(L);
+  let lp = 0; for (let i = 0; i < L; i++) { lp += ((Math.random() * 2 - 1) - lp) * o.bright; buf[i] = lp; }
+  if (o.pick) { const D = Math.max(1, Math.floor(o.pick * L)), tmp = buf.slice(); for (let i = 0; i < L; i++) buf[i] = tmp[i] - .85 * tmp[(i - D + L) % L]; }
+  let mean = 0; for (let i = 0; i < L; i++) mean += buf[i]; mean /= L; for (let i = 0; i < L; i++) buf[i] -= mean;
+  const g = Math.pow(.001, 1 / (sr * o.t60));
+  let p = 0, prev = 0, apx = 0, apy = 0;
+  for (let n = 0; n < out.length; n++) {
+    const x = buf[p]; out[n] = x;
+    const avg = (1 - o.damp) * x + o.damp * prev; prev = x;
+    const ap = C * avg + apx - C * apy; apx = avg; apy = ap;
+    buf[p] = ap * g; if (++p >= L) p = 0;
+  }
+  return out;
+}
+function synthGtr(sr, midi) {
+  const f = mtof(midi);
+  const a = ks(sr, f, 3, { bright: .45, pick: .17, t60: 3.6 * Math.pow(110 / f, .35), damp: .5 });
+  return fadeEdges(normalize(a, .5), sr, .001, .15);
+}
+function synthHpsi(sr, midi) {
+  const f = mtof(midi);
+  const a = ks(sr, f, 1.6, { bright: .95, pick: .1, t60: 1.5, damp: .38 });
+  const b = ks(sr, f * 2, 1.6, { bright: .95, pick: .13, t60: 1.1, damp: .38 });
+  for (let i = 0; i < a.length; i++) a[i] = a[i] + b[i] * .35;
+  return fadeEdges(normalize(a, .45), sr, .0005, .1);
+}
+
+// ---------------------------------------------------------------------
+//  Engine: graph, lookahead scheduler, instruments
+// ---------------------------------------------------------------------
+const LONG = new Set(['str', 'organ', 'rain', 'crickets', 'wind', 'cello']);
+class Engine {
+  constructor(score, ctx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    this.ctx = ctx || new AC({ latencyHint: 'playback' });
+    const c = this.ctx; this.sr = c.sampleRate; this.E = score;
+    this.out = c.createGain(); this.out.connect(c.destination);
+    this.comp = c.createDynamicsCompressor();
+    this.comp.threshold.value = -15; this.comp.knee.value = 10; this.comp.ratio.value = 3; this.comp.attack.value = .008; this.comp.release.value = .3;
+    this.comp.connect(this.out);
+    this.master = c.createGain(); this.master.gain.value = .85; this.master.connect(this.comp);
+    this.rev = c.createConvolver(); const rg = c.createGain(); rg.gain.value = .85; this.rev.connect(rg); rg.connect(this.master);
+    this.bus = {};
+    const mk = (name, gain, send, chain) => {
+      const g = c.createGain(); g.gain.value = gain; let last = g;
+      for (const f of (chain || [])) { const b = c.createBiquadFilter(); b.type = f[0]; b.frequency.value = f[1]; if (f[2] !== undefined) b.gain.value = f[2]; if (f[3] !== undefined) b.Q.value = f[3]; last.connect(b); last = b; }
+      last.connect(this.master); const s = c.createGain(); s.gain.value = send; last.connect(s); s.connect(this.rev); this.bus[name] = g;
+    };
+    mk('pno', .95, .34, [['lowshelf', 180, 2], ['highshelf', 5000, -3]]);
+    mk('mbox', .5, .6); mk('bell', .45, .75);
+    mk('gtr', .75, .3, [['peaking', 210, 3, .9], ['lowpass', 5200]]);
+    mk('str', .55, .55); mk('vln', .5, .5, [['highpass', 220], ['peaking', 2600, 2, 1]]);
+    mk('org', .4, .55); mk('hpsi', .32, .38); mk('cello', .5, .35);
+    mk('bass', .6, .06); mk('drum', .55, .14); mk('fx', .6, .45); mk('amb', .7, .12);
+    this.lfo = c.createOscillator(); this.lfo.frequency.value = 5.2; this.lfoG = c.createGain(); this.lfoG.gain.value = 4; this.lfo.connect(this.lfoG); this.lfo.start();
+    this.active = new Set(); this.buf = {}; this.idx = 0; this.startPos = 0; this.base = 0; this.ready = false; this.vol = 1;
+  }
+  async prepare(onProgress) {
+    const c = this.ctx, sr = this.sr;
+    const jobs = [];
+    const need = {}; for (const e of this.E) if (['pno', 'mbox', 'gtr', 'hpsi', 'bell'].includes(e.i)) (need[e.i] = need[e.i] || new Set()).add(e.m);
+    const fns = { pno: synthPiano, mbox: synthMbox, gtr: synthGtr, hpsi: synthHpsi, bell: synthBell };
+    for (const k in need) for (const m of need[k]) jobs.push(() => { this.buf[k + m] = this.mkBuf([fns[k](sr, m)]); });
+    jobs.push(() => { this.rev.buffer = this.mkIR(3.4); });
+    jobs.push(() => { this.noise = this.mkNoise(4, 'white'); this.pink = this.mkNoise(6, 'pink'); this.brown = this.mkNoise(6, 'brown'); });
+    jobs.push(() => { this.cricket = this.mkCrickets(4); this.shatterB = this.mkShatter(); });
+    for (let i = 0; i < jobs.length; i++) {
+      jobs[i]();
+      if (i % 3 === 2) { onProgress && onProgress(i / jobs.length); await new Promise(r => setTimeout(r, 0)); }
+    }
+    this.org = c.createPeriodicWave(new Float32Array(10), new Float32Array([0, 1, .75, .1, .5, .05, .3, 0, .22, .1]));
+    this.ready = true; onProgress && onProgress(1);
+  }
+  mkBuf(chs) { const b = this.ctx.createBuffer(chs.length, chs[0].length, this.sr); chs.forEach((d, i) => b.copyToChannel(d, i)); return b; }
+  mkIR(sec) {
+    const sr = this.sr, n = Math.floor(sr * sec), L = new Float32Array(n), R = new Float32Array(n);
+    for (const ch of [L, R]) {
+      let lp = 0;
+      for (let i = 0; i < n; i++) {
+        const t = i / sr, k = .12 + .85 * Math.exp(-t / 1.1);
+        lp += ((Math.random() * 2 - 1) - lp) * k;
+        ch[i] = lp * Math.pow(1 - i / n, 2.2) * Math.exp(-t / .9) * (t < .012 ? t / .012 : 1);
+      }
+    }
+    return this.mkBuf([L, R]);
+  }
+  mkNoise(sec, kind) {
+    const n = Math.floor(this.sr * sec), chs = [new Float32Array(n), new Float32Array(n)];
+    for (const d of chs) {
+      let b0 = 0, b1 = 0, b2 = 0, br = 0;
+      for (let i = 0; i < n; i++) {
+        const w = Math.random() * 2 - 1;
+        if (kind === 'pink') { b0 = .99765 * b0 + w * .099; b1 = .963 * b1 + w * .2965; b2 = .57 * b2 + w * 1.0527; d[i] = (b0 + b1 + b2 + w * .1848) * .2; }
+        else if (kind === 'brown') { br = (br + .02 * w) / 1.02; d[i] = br * 3.5; }
+        else d[i] = w * .5;
+      }
+      const F = 2000; for (let i = 0; i < F; i++) { const k = i / F; d[i] = d[i] * k + d[n - F + i] * (1 - k); }
+    }
+    return this.mkBuf(chs);
+  }
+  mkCrickets(sec) {
+    const sr = this.sr, n = Math.floor(sr * sec), L = new Float32Array(n), R = new Float32Array(n);
+    for (let c = 0; c < 26; c++) {
+      const t0 = Math.random() * sec, f = 4000 + Math.random() * 1400, pan = Math.random(), a = .2 + Math.random() * .8, pulses = 2 + (Math.random() * 3 | 0);
+      for (let p = 0; p < pulses; p++) {
+        const s0 = Math.floor((t0 + p * .045) * sr), len = Math.floor(.028 * sr);
+        for (let i = 0; i < len; i++) {
+          const idx = (s0 + i) % n, env = Math.sin(Math.PI * i / len) ** 2, v = Math.sin(2 * Math.PI * f * i / sr) * env * a * .25;
+          L[idx] += v * (1 - pan); R[idx] += v * pan;
+        }
+      }
+    }
+    return this.mkBuf([L, R]);
+  }
+  mkShatter() {
+    const sr = this.sr, n = Math.floor(sr * 2.5), L = new Float32Array(n), R = new Float32Array(n);
+    for (let i = 0; i < n; i++) { const t = i / sr, w = (Math.random() * 2 - 1) * Math.exp(-t / .09) * .6; L[i] += w; R[i] += w * (.7 + .3 * Math.random()); }
+    for (let k = 0; k < 46; k++) {
+      const t0 = Math.pow(Math.random(), 1.6) * .9, f = 1800 + Math.random() * 5200, tau = .08 + Math.random() * .5, a = .08 + Math.random() * .25, pan = Math.random();
+      const s0 = Math.floor(t0 * sr), len = Math.min(n - s0, Math.floor(tau * 6 * sr));
+      for (let i = 0; i < len; i++) { const v = Math.sin(2 * Math.PI * f * i / sr) * a * Math.exp(-i / (tau * sr)); L[s0 + i] += v * (1 - pan); R[s0 + i] += v * pan; }
+    }
+    normalize(L, .8); normalize(R, .8);
+    return this.mkBuf([L, R]);
+  }
+  // ---- transport ----
+  songTime() { return this.startPos + Math.max(0, this.ctx.currentTime - this.base); }
+  stopAll() { for (const n of this.active) { try { n.stop(); } catch (e) { } } this.active.clear(); }
+  track(n) { this.active.add(n); n.onended = () => this.active.delete(n); }
+  startAt(pos) {
+    this.stopAll(); const c = this.ctx;
+    this.startPos = pos; this.base = c.currentTime + .06;
+    let lo = 0, hi = this.E.length; while (lo < hi) { const m = (lo + hi) >> 1; if (this.E[m].t < pos) lo = m + 1; else hi = m; }
+    this.idx = lo;
+    for (let i = 0; i < lo; i++) { const e = this.E[i]; if (LONG.has(e.i) && e.t + e.d > pos + .4) this.play(e, this.base, pos - e.t); }
+    this.tick();
+  }
+  tick() {
+    if (!this.ready) return;
+    const c = this.ctx, now = this.songTime(), until = now + .6;
+    while (this.idx < this.E.length && this.E[this.idx].t < until) {
+      const e = this.E[this.idx++];
+      if (e.t < now - .08) continue;
+      this.play(e, Math.max(c.currentTime + .005, this.base + (e.t - this.startPos)), 0);
+    }
+  }
+  setVolume(v) { this.vol = v; this.out.gain.setTargetAtTime(v, this.ctx.currentTime, .05); }
+  // ---- instruments ----
+  env(g, when, v, a, d, r) { const p = g.gain; p.setValueAtTime(0, when); p.linearRampToValueAtTime(v, when + a); p.setValueAtTime(v, when + Math.max(a, d)); p.linearRampToValueAtTime(0, when + Math.max(a, d) + r); return when + Math.max(a, d) + r + .05; }
+  sample(key, bus, when, dur, vel, off = 0, rel = .3, rate = 1) {
+    const b = this.buf[key]; if (!b) return; const c = this.ctx;
+    const s = c.createBufferSource(); s.buffer = b; s.playbackRate.value = rate;
+    const g = c.createGain(); const end = when + Math.max(.04, dur - off);
+    g.gain.setValueAtTime(vel, when); g.gain.setValueAtTime(vel, end); g.gain.setTargetAtTime(0, end, rel / 3);
+    s.connect(g); g.connect(this.bus[bus]);
+    const o = Math.min(off, b.duration - .02); s.start(when, o); s.stop(Math.min(when + (b.duration - o) / rate, end + rel * 2.5)); this.track(s);
+  }
+  noiseSrc(buf, when, loop = false, off = 0) { const s = this.ctx.createBufferSource(); s.buffer = buf; s.loop = loop; s.start(when, off % buf.duration); this.track(s); return s; }
+  filt(type, f, q = .7) { const b = this.ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; return b; }
+  chain(...nodes) { for (let i = 0; i < nodes.length - 1; i++) nodes[i].connect(nodes[i + 1]); return nodes[nodes.length - 1]; }
+  play(e, when, off) {
+    const c = this.ctx, v = e.v;
+    switch (e.i) {
+      case 'pno': this.sample('pno' + e.m, 'pno', when, e.d, v * 1.1, off, .35); break;
+      case 'mbox': this.sample('mbox' + e.m, 'mbox', when, e.d + 1.5, v, off, .5); break;
+      case 'bell': this.sample('bell' + e.m, 'bell', when, e.d, v, off, 1); break;
+      case 'gtr': this.sample('gtr' + e.m, 'gtr', when, e.d, v * 1.1, off, .25); break;
+      case 'hpsi': this.sample('hpsi' + e.m, 'hpsi', when, e.d + .3, v, off, .15); break;
+      case 'str': {
+        const x = e.x, notes = x.notes, d = e.d - off, a = off > 0 ? .4 : (x.atk || 1.1);
+        const g = c.createGain(), f = this.filt('lowpass', x.cut || 1600, .5);
+        f.connect(g); g.connect(this.bus.str);
+        const stop = this.env(g, when, v, a, d, x.rel || 1.5);
+        for (const m of notes) for (const dt of [-8, 7]) {
+          const o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.value = mtof(m); o.detune.value = dt; this.lfoG.connect(o.detune);
+          const og = c.createGain(); og.gain.value = .28 / notes.length; o.connect(og); og.connect(f); o.start(when); o.stop(stop); this.track(o);
+        }
+        break;
+      }
+      case 'vln': {
+        const f0 = mtof(e.m), g = c.createGain(), lp = this.filt('lowpass', 2900, .8);
+        lp.connect(g); g.connect(this.bus.vln);
+        const stop = this.env(g, when, v, .1, e.d, .3);
+        const lfo = c.createOscillator(); lfo.frequency.value = 5.6; const lg = c.createGain(); lg.gain.setValueAtTime(0, when); lg.gain.linearRampToValueAtTime(11, when + .45); lfo.connect(lg);
+        for (const dt of [-4, 5]) { const o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f0; o.detune.value = dt; lg.connect(o.detune); const og = c.createGain(); og.gain.value = .3; o.connect(og); og.connect(lp); o.start(when); o.stop(stop); this.track(o); }
+        lfo.start(when); lfo.stop(stop); this.track(lfo);
+        break;
+      }
+      case 'organ': {
+        const notes = e.x.notes, d = e.d - off, g = c.createGain(), lp = this.filt('lowpass', 2600, .5);
+        lp.connect(g); g.connect(this.bus.org);
+        const stop = this.env(g, when, v, off > 0 ? .3 : .15, d, .7);
+        for (const m of notes) { const o = c.createOscillator(); o.setPeriodicWave(this.org); o.frequency.value = mtof(m); const og = c.createGain(); og.gain.value = .35 / notes.length; o.connect(og); og.connect(lp); o.start(when); o.stop(stop); this.track(o); }
+        break;
+      }
+      case 'cello': {
+        const f0 = mtof(e.m), g = c.createGain(), lp = this.filt('lowpass', 750, .6);
+        lp.connect(g); g.connect(this.bus.cello);
+        const stop = this.env(g, when, v, e.d > 1 ? .3 : .03, e.d - off, e.d > 1 ? .7 : .12);
+        for (const dt of [-5, 5]) { const o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.value = f0; o.detune.value = dt; const og = c.createGain(); og.gain.value = .35; o.connect(og); og.connect(lp); o.start(when); o.stop(stop); this.track(o); }
+        break;
+      }
+      case 'bass': {
+        const f0 = mtof(e.m), g = c.createGain(), lp = this.filt('lowpass', 700, .7);
+        lp.connect(g); g.connect(this.bus.bass);
+        const p = g.gain; p.setValueAtTime(0, when); p.linearRampToValueAtTime(v, when + .012); p.exponentialRampToValueAtTime(v * .55, when + .35); p.setValueAtTime(v * .55, when + e.d); p.linearRampToValueAtTime(0, when + e.d + .12);
+        const o1 = c.createOscillator(); o1.type = 'triangle'; o1.frequency.value = f0; const o2 = c.createOscillator(); o2.frequency.value = f0;
+        const g2 = c.createGain(); g2.gain.value = .7; o2.connect(g2); g2.connect(lp); o1.connect(lp);
+        for (const o of [o1, o2]) { o.start(when); o.stop(when + e.d + .2); this.track(o); }
+        break;
+      }
+      case 'kick': {
+        const o = c.createOscillator(), g = c.createGain(); o.frequency.setValueAtTime(130, when); o.frequency.exponentialRampToValueAtTime(46, when + .12);
+        g.gain.setValueAtTime(v, when); g.gain.exponentialRampToValueAtTime(.001, when + .42); o.connect(g); g.connect(this.bus.drum); o.start(when); o.stop(when + .45); this.track(o);
+        break;
+      }
+      case 'snare': {
+        const s = this.noiseSrc(this.noise, when, false, Math.random()), bp = this.filt('bandpass', 1900, .7), g = c.createGain();
+        g.gain.setValueAtTime(v, when); g.gain.exponentialRampToValueAtTime(.001, when + .2); this.chain(s, bp, g, this.bus.drum); s.stop(when + .25);
+        const o = c.createOscillator(), og = c.createGain(); o.frequency.value = 190; og.gain.setValueAtTime(v * .6, when); og.gain.exponentialRampToValueAtTime(.001, when + .09); o.connect(og); og.connect(this.bus.drum); o.start(when); o.stop(when + .1); this.track(o);
+        break;
+      }
+      case 'hat': {
+        const s = this.noiseSrc(this.noise, when, false, Math.random() * 3), hp = this.filt('highpass', 7500, .7), g = c.createGain();
+        g.gain.setValueAtTime(v, when); g.gain.exponentialRampToValueAtTime(.001, when + .05); this.chain(s, hp, g, this.bus.drum); s.stop(when + .07);
+        break;
+      }
+      case 'crash': {
+        const s = this.noiseSrc(this.noise, when, false, Math.random() * 2), hp = this.filt('highpass', 4500, .5), g = c.createGain();
+        g.gain.setValueAtTime(v, when); g.gain.exponentialRampToValueAtTime(.001, when + e.d); this.chain(s, hp, g, this.bus.fx); s.stop(when + e.d);
+        break;
+      }
+      case 'swell': {
+        const s = this.noiseSrc(this.pink, when, true, Math.random()), bp = this.filt('bandpass', 900, .6), g = c.createGain();
+        bp.frequency.setValueAtTime(400, when); bp.frequency.exponentialRampToValueAtTime(6000, when + e.d);
+        g.gain.setValueAtTime(.0001, when); g.gain.exponentialRampToValueAtTime(v, when + e.d); g.gain.linearRampToValueAtTime(0, when + e.d + .05);
+        this.chain(s, bp, g, this.bus.fx); s.stop(when + e.d + .1);
+        break;
+      }
+      case 'timp': {
+        const f0 = mtof(e.m), o = c.createOscillator(), g = c.createGain();
+        o.frequency.setValueAtTime(f0 * 1.04, when); o.frequency.exponentialRampToValueAtTime(f0, when + .15);
+        g.gain.setValueAtTime(v, when); g.gain.exponentialRampToValueAtTime(.001, when + e.d); o.connect(g); g.connect(this.bus.drum); o.start(when); o.stop(when + e.d); this.track(o);
+        const s = this.noiseSrc(this.brown, when, false, Math.random()), lp = this.filt('lowpass', 300), ng = c.createGain();
+        ng.gain.setValueAtTime(v * 1.2, when); ng.gain.exponentialRampToValueAtTime(.001, when + .4); this.chain(s, lp, ng, this.bus.drum); s.stop(when + .45);
+        break;
+      }
+      case 'boom': {
+        const o = c.createOscillator(), g = c.createGain(); o.frequency.setValueAtTime(70, when); o.frequency.exponentialRampToValueAtTime(30, when + 2);
+        g.gain.setValueAtTime(v, when); g.gain.exponentialRampToValueAtTime(.001, when + e.d); o.connect(g); g.connect(this.bus.fx); o.start(when); o.stop(when + e.d); this.track(o);
+        break;
+      }
+      case 'shatter': { const s = c.createBufferSource(); s.buffer = this.shatterB; const g = c.createGain(); g.gain.value = v; s.connect(g); g.connect(this.bus.fx); s.start(when); this.track(s); break; }
+      case 'rain': {
+        const d = e.d - off, g = c.createGain(); const stop = this.env(g, when, v, off > 0 ? 1 : 3.5, d - 2, 2.5); g.connect(this.bus.amb);
+        const s1 = this.noiseSrc(this.pink, when, true, off), hp = this.filt('highpass', 500), lp = this.filt('lowpass', 6500); this.chain(s1, hp, lp, g); s1.stop(stop);
+        const s2 = this.noiseSrc(this.noise, when, true, off + 1.3), bp = this.filt('bandpass', 2600, .5), g2 = c.createGain(); g2.gain.value = .25; this.chain(s2, bp, g2, g); s2.stop(stop);
+        break;
+      }
+      case 'thunder': case 'thunderFar': {
+        const far = e.i === 'thunderFar', s = this.noiseSrc(this.brown, when, false, Math.random() * 2), lp = this.filt('lowpass', far ? 180 : 420), g = c.createGain(), p = g.gain;
+        p.setValueAtTime(0, when); p.linearRampToValueAtTime(v, when + (far ? .6 : .05)); p.linearRampToValueAtTime(v * .5, when + 1.2); p.linearRampToValueAtTime(v * .8, when + 1.8); p.exponentialRampToValueAtTime(.001, when + e.d);
+        this.chain(s, lp, g, this.bus.fx); s.stop(when + e.d);
+        if (!far) { const s2 = this.noiseSrc(this.noise, when, false, 0), hp = this.filt('highpass', 1200), g2 = c.createGain(); g2.gain.setValueAtTime(v * .5, when); g2.gain.exponentialRampToValueAtTime(.001, when + .35); this.chain(s2, hp, g2, this.bus.fx); s2.stop(when + .4); }
+        break;
+      }
+      case 'crickets': { const g = c.createGain(); const stop = this.env(g, when, v, off > 0 ? 1 : 3, e.d - off - 2, 2); g.connect(this.bus.amb); const s = this.noiseSrc(this.cricket, when, true, off); s.connect(g); s.stop(stop); break; }
+      case 'wind': {
+        const g = c.createGain(); const stop = this.env(g, when, v, off > 0 ? 1 : 4, e.d - off - 3, 3); g.connect(this.bus.amb);
+        const s = this.noiseSrc(this.pink, when, true, off), bp = this.filt('bandpass', 380, .8); this.chain(s, bp, g); s.stop(stop);
+        const l = c.createOscillator(); l.frequency.value = .09; const lg = c.createGain(); lg.gain.value = 160; l.connect(lg); lg.connect(bp.frequency); l.start(when); l.stop(stop); this.track(l);
+        break;
+      }
+    }
+  }
+}
+
+// =====================================================================
+//  WEBGL — scene backgrounds, 2D-layer lighting, particles, post
+// =====================================================================
+const GLSL_COMMON = `#version 300 es
+precision highp float;
+uniform vec2 uRes; uniform vec3 uView; uniform vec3 uCam;
+float h11(float p){ p=fract(p*.1031); p*=p+33.33; p*=p+p; return fract(p); }
+float h12(vec2 p){ vec3 p3=fract(vec3(p.xyx)*.1031); p3+=dot(p3,p3.yzx+33.33); return fract((p3.x+p3.y)*p3.z); }
+vec2 h22(vec2 p){ vec3 p3=fract(vec3(p.xyx)*vec3(.1031,.1030,.0973)); p3+=dot(p3,p3.yzx+33.33); return fract((p3.xx+p3.yz)*p3.zy); }
+vec3 h32(vec2 p){ vec3 p3=fract(vec3(p.xyx)*vec3(.1031,.1030,.0973)); p3+=dot(p3,p3.yxz+33.33); return fract((p3.xxy+p3.yzz)*p3.zyx); }
+float vn(vec2 p){ vec2 i=floor(p), f=fract(p); vec2 u=f*f*(3.-2.*f);
+  return mix(mix(h12(i),h12(i+vec2(1,0)),u.x), mix(h12(i+vec2(0,1)),h12(i+vec2(1,1)),u.x), u.y); }
+const mat2 RM = mat2(1.6,1.2,-1.2,1.6);
+float fbm(vec2 p){ float s=0., a=.5; for(int i=0;i<5;i++){ s+=a*vn(p); p=RM*p+vec2(3.1,7.7); a*=.5; } return s/.97; }
+float fbm3(vec2 p){ float s=0., a=.5; for(int i=0;i<3;i++){ s+=a*vn(p); p=RM*p+vec2(3.1,7.7); a*=.5; } return s/.875; }
+float n1(float x){ float i=floor(x), f=fract(x); f=f*f*(3.-2.*f); return mix(h11(i),h11(i+1.),f); }
+float ridge(float x, float s){ return n1(x+s)*.55 + n1(x*2.13+s*1.7)*.27 + n1(x*4.37+s*2.9)*.13 + n1(x*9.1+s)*.05; }
+`;
+
+const VS_FS = `#version 300 es
+in vec2 aP; out vec2 vUv; void main(){ vUv=aP*.5+.5; gl_Position=vec4(aP,0.,1.); }`;
+
+// ---------------------------------------------------------------- scene backgrounds
+const FS_BG = GLSL_COMMON + `
+in vec2 vUv; out vec4 o;
+uniform float uT; uniform int uScene; uniform vec4 uP0, uP1, uP2; uniform vec4 uMet[4];
+vec2 par(vec2 p, float d){ float z=mix(1.,uCam.z,d); return (p-vec2(960.,540.))/z + vec2(960.,540.) + (uCam.xy-vec2(960.,540.))*d; }
+float pxs(){ return 1.3/uView.z; }
+float cover(float d){ return smoothstep(-pxs(), pxs(), d); }
+vec3 stars(vec2 p, float cell, float dens, float bright, float t){
+  vec2 g=floor(p/cell), f=fract(p/cell); float h=h12(g);
+  if(h>dens) return vec3(0.);
+  vec2 c=.2+.6*h22(g+13.7); float d=length(f-c)*cell;
+  float m=pow(h12(g+5.3),6.);
+  float sz=max(.55+1.7*m, .9/uView.z);
+  float tw=.6+.4*sin(t*(.7+2.3*h12(g+9.1))+h*80.);
+  float core=exp(-d*d/(sz*sz)), halo=exp(-d/(sz*4.))*.16*(m+.1);
+  vec3 col=mix(vec3(.72,.83,1.), vec3(1.,.88,.74), h12(g+2.9));
+  return col*(core+halo)*tw*bright*(.35+1.6*m);
+}
+// ── 0 prologue: twin nebula
+vec3 scPrologue(vec2 p, float t){
+  vec2 q=par(p,.15)/1080.;
+  vec3 col=mix(vec3(.004,.006,.016), vec3(.02,.026,.06), smoothstep(.9,.0,abs(q.y-.55)));
+  float a=fbm(vec2(q.x*2.1+t*.012, q.y*2.6));
+  float b=fbm(vec2(q.x*2.4-t*.01+4., q.y*2.2+a*1.3));
+  float bandA=exp(-pow((q.y-.52-.11*sin(q.x*3.1+.6+t*.02))/.2,2.));
+  float bandB=exp(-pow((q.y-.50+.11*sin(q.x*3.1+.6+t*.02))/.2,2.));
+  col+=vec3(.16,.27,.66)*pow(a,2.2)*bandA*1.35;
+  col+=vec3(.13,.52,.37)*pow(b,2.5)*bandB*1.15;
+  col+=vec3(.55,.36,.62)*pow(fbm(q*7.+3.),4.)*.3*(bandA+bandB);
+  vec2 sp=par(p,.1);
+  col+=stars(sp,23.,.32,1.,t)+stars(sp+vec2(331.,97.),57.,.5,1.4,t)+stars(sp+vec2(71.,13.),11.,.17,.45,t);
+  return col*uP0.x;
+}
+// ── 1 dusk
+vec3 scDusk(vec2 p, float t){
+  vec2 sun=uP0.xy; float y=p.y/1080.;
+  vec3 col=mix(vec3(.12,.15,.36), vec3(.52,.32,.52), smoothstep(.0,.36,y));
+  col=mix(col, vec3(.97,.54,.42), smoothstep(.28,.6,y));
+  col=mix(col, vec3(1.,.8,.52), smoothstep(.53,.7,y));
+  float d=length((p-sun)*vec2(1.,1.12));
+  col+=vec3(1.,.6,.35)*exp(-d/430.)*.55 + vec3(1.,.86,.62)*exp(-d/105.)*.75;
+  float ang=atan(p.y-sun.y, p.x-sun.x);
+  float rays=pow(fbm3(vec2(ang*6., t*.04)),3.)*1.5;
+  col+=vec3(1.,.72,.46)*rays*exp(-d/650.)*.33*smoothstep(0.,120.,d);
+  vec2 cp=par(p,.12);
+  float cn=fbm(vec2(cp.x/520.+t*.005, cp.y/95.));
+  float cm=smoothstep(.52,.78,cn)*smoothstep(.06,.26,y)*smoothstep(.62,.4,y);
+  float lit=exp(-abs(cp.x-sun.x)/650.);
+  vec3 cc=mix(vec3(.42,.27,.46), vec3(1.,.62,.48), lit*.85+.1);
+  cc+=vec3(1.,.8,.5)*pow(lit,3.)*smoothstep(.62,.9,cn)*.6;
+  col=mix(col, cc, cm*.85);
+  col=mix(col, vec3(1.,.95,.82)*2.4, smoothstep(47.,43.,length(p-sun)));
+  vec2 a=par(p,.22); float hA=688.+60.*ridge(a.x/420.,3.);
+  col=mix(col, mix(col, vec3(.8,.47,.52), .55), cover(a.y-hA));
+  vec2 b=par(p,.42); float hB=742.+70.*ridge(b.x/330.,7.);
+  col=mix(col, vec3(.5,.28,.4), cover(b.y-hB));
+  vec2 c=par(p,.65); float hC=802.+50.*ridge(c.x/260.,13.);
+  col=mix(col, vec3(.3,.17,.27), cover(c.y-hC));
+  col+=vec3(1.,.6,.4)*exp(-abs(p.y-720.)/60.)*.1;
+  return col;
+}
+// ── 2 sakura walk
+vec3 scWalk(vec2 p, float t){
+  float y=p.y/1080.;
+  vec3 col=mix(vec3(.42,.58,.87), vec3(.8,.78,.93), smoothstep(.0,.5,y));
+  col=mix(col, vec3(1.,.85,.87), smoothstep(.4,.72,y));
+  vec2 sun=vec2(1560.,170.); float d=length(p-sun);
+  col+=vec3(1.,.95,.88)*(exp(-d/380.)*.5+exp(-d/70.)*.55);
+  vec2 cp=par(p,.06);
+  float cn=fbm(vec2(cp.x/650.+t*.01, cp.y/170.));
+  col=mix(col, vec3(1.,.97,.98), smoothstep(.5,.8,cn)*smoothstep(.62,.05,y)*.75);
+  vec2 bp=par(p,.18);
+  float bx=floor(bp.x/64.); float bh=655.-150.*pow(h11(bx*1.3),2.2)-40.*h11(bx*7.1);
+  col=mix(col, mix(col, vec3(.74,.68,.86), .65), cover(bp.y-bh));
+  vec2 tp=par(p,.4);
+  float top=705.-95.*fbm3(vec2(tp.x/130.,2.));
+  float tn=fbm(tp/38.);
+  col=mix(col, mix(vec3(.95,.69,.8), vec3(1.,.87,.91), tn), cover(tp.y-top)*.95);
+  vec2 tq=par(p,.55);
+  float trunk=step(.82, h11(floor(tq.x/90.)))*step(abs(fract(tq.x/90.)-.5),.035);
+  col=mix(col, vec3(.55,.4,.45), trunk*cover(tq.y-720.)*.6);
+  vec2 gp=par(p,1.);
+  vec3 g=mix(vec3(.88,.77,.79), vec3(.72,.6,.65), smoothstep(820.,1080.,p.y));
+  float spots=smoothstep(.7,.78, vn(vec2(gp.x/9., gp.y/4.)));
+  g=mix(g, vec3(1.,.83,.89), spots*.7);
+  g=mix(g, vec3(.8,.66,.7), smoothstep(.45,.55,vn(vec2(gp.x/300.,1.)))*.15);
+  col=mix(col, g, cover(p.y-822.));
+  return col;
+}
+// ── 3 stage
+vec3 scStage(vec2 p, float t){
+  float on=uP0.x, beat=uP0.y;
+  vec3 col=vec3(.012,.01,.026);
+  col+=vec3(.24,.1,.34)*exp(-pow((p.y-470.)/260.,2.))*.55*on;
+  col+=vec3(.08,.13,.34)*exp(-length((p-vec2(960.,500.))/vec2(760.,320.)))*.5*on;
+  for(int i=0;i<9;i++){ float fi=float(i); vec2 lp=vec2(160.+fi*200., 135.); col+=vec3(1.,.9,.8)*exp(-length(p-lp)/6.)*.9*on; }
+  for(int i=0;i<6;i++){
+    float fi=float(i);
+    vec2 o2=vec2(240.+fi*290.,135.);
+    float sw=sin(t*.55+fi*1.9)*.36*(mod(fi,2.)*2.-1.);
+    vec2 dir=vec2(cos(1.5708+sw), sin(1.5708+sw));
+    vec2 v=p-o2; float al=dot(v,dir); float pe=abs(v.x*dir.y-v.y*dir.x);
+    float w=12.+al*.16;
+    float bm=exp(-pow(pe/w,2.))*smoothstep(0.,60.,al)*exp(-al/1500.);
+    float hz=.45+.55*fbm3(vec2(p.x/160.+t*.05, p.y/120.-t*.04));
+    float m3=mod(fi,3.);
+    vec3 bc=m3<.5? vec3(.45,.62,1.) : (m3<1.5? vec3(.5,1.,.72) : vec3(1.,.6,.82));
+    float pulse=.7+.3*pow(.5+.5*cos(beat*6.2832+fi*.7),3.);
+    col+=bc*bm*hz*.5*on*pulse;
+  }
+  float fl=cover(p.y-862.);
+  vec3 floorc=vec3(.035,.028,.045)+vec3(.15,.12,.25)*exp(-abs(p.y-862.)/40.)*on;
+  floorc+=vec3(.3,.25,.5)*exp(-pow((p.x-960.)/500.,2.))*exp(-(p.y-862.)/90.)*.25*on;
+  col=mix(col, floorc, fl);
+  return col;
+}
+// ── 4 rain
+vec3 rainSky(vec2 p, float t){
+  float y=p.y/1080.;
+  vec3 col=mix(vec3(.02,.03,.06), vec3(.08,.1,.14), smoothstep(0.,.75,y));
+  vec2 cp=par(p,.05);
+  col+=vec3(.17,.12,.11)*fbm(vec2(cp.x/500.+t*.01, cp.y/160.))*smoothstep(.0,.7,y)*.6;
+  col+=vec3(.5,.55,.8)*uP1.x*smoothstep(.75,.0,y)*fbm3(cp/300.);
+  vec2 b1=par(p,.25);
+  float bx=floor(b1.x/90.); float h1=520.-260.*pow(h11(bx*3.7),1.5);
+  vec3 bc=vec3(.035,.045,.07);
+  vec2 wc=vec2(b1.x/14., b1.y/18.); vec2 wi=floor(wc), wf=fract(wc);
+  float lit=step(.72,h12(wi+bx*7.))*step(.2,wf.x)*step(wf.x,.7)*step(.25,wf.y)*step(wf.y,.75);
+  vec3 wcol=mix(vec3(1.,.75,.45), vec3(.7,.85,1.), step(.8,h12(wi+3.)));
+  bc+=wcol*lit*.33*(.8+.2*sin(t*3.+h12(wi)*50.));
+  col=mix(col, bc, cover(b1.y-h1));
+  vec2 b2=par(p,.45);
+  float bx2=floor(b2.x/150.); float h2=600.-200.*pow(h11(bx2*5.1+2.),1.3);
+  vec3 b2c=vec3(.02,.025,.04);
+  vec2 wc2=vec2(b2.x/20., b2.y/26.); vec2 wi2=floor(wc2), wf2=fract(wc2);
+  float lit2=step(.78,h12(wi2+bx2*11.))*step(.2,wf2.x)*step(wf2.x,.75)*step(.2,wf2.y)*step(wf2.y,.7);
+  b2c+=vec3(1.,.72,.4)*lit2*.45;
+  col=mix(col, b2c, cover(b2.y-h2));
+  vec2 bk=par(p,.6);
+  for(int i=0;i<2;i++){
+    float cs=i==0?110.:170.;
+    vec2 g=floor(bk/cs), f=fract(bk/cs);
+    vec2 c=.25+.5*h22(g+float(i)*17.);
+    float r=(.2+.16*h12(g+4.))*cs*.5;
+    float dd=length((f-c)*cs);
+    float disc=smoothstep(r,r*.85,dd)*(.55+.45*smoothstep(r*.5,r,dd));
+    vec3 kc=mix(vec3(1.,.6,.3), vec3(.4,.7,1.), h12(g+9.));
+    kc=mix(kc, vec3(1.,.3,.35), step(.86,h12(g+1.)));
+    float show=step(.45,h12(g+20.))*smoothstep(420.,680.,bk.y)*smoothstep(860.,760.,bk.y);
+    col+=kc*disc*show*.2;
+  }
+  return col;
+}
+vec3 scRain(vec2 p, float t){
+  float hor=805.; vec2 lamp=uP0.xy; float on=uP0.z;
+  vec3 col;
+  if(p.y<hor) col=rainSky(p,t);
+  else {
+    float k=p.y-hor;
+    vec2 q=vec2(p.x+(vn(vec2(p.x/40., p.y/6.-t*2.))-.5)*18.*smoothstep(0.,200.,k), hor-k);
+    col=rainSky(q,t)*.3;
+    col=mix(col, vec3(.03,.035,.05), .4);
+    vec2 rp=vec2(p.x, (p.y-hor)*3.2);
+    vec2 g=floor(rp/62.), f=fract(rp/62.)-.5;
+    float ph=fract(t*.9+h12(g));
+    float rr=length(f)*62.;
+    float ring=exp(-pow((rr-ph*28.)/2.,2.))*(1.-ph)*step(.35,h12(g+3.));
+    col+=vec3(.4,.45,.55)*ring*.28;
+    col+=vec3(.06,.07,.1)*smoothstep(1080.,hor,p.y)*.5;
+  }
+  vec2 v=p-lamp;
+  if(v.y>0.){ float w=30.+v.y*.43; float cone=exp(-pow(v.x/w,2.)*1.4)*exp(-v.y/950.)*smoothstep(0.,40.,v.y);
+    float hz=.55+.45*fbm3(vec2(p.x/90., p.y/70.-t*.3));
+    col+=vec3(1.,.82,.55)*cone*hz*.36*on; }
+  float pool=exp(-pow((p.x-lamp.x)/240.,2.)-pow((p.y-910.)/48.,2.));
+  col+=vec3(1.,.8,.52)*pool*.38*step(hor,p.y)*on;
+  col+=vec3(1.,.85,.6)*exp(-length(v)/42.)*.55*on;
+  col+=vec3(.55,.6,.85)*uP1.x*.35;
+  return col;
+}
+// ── 5 masquerade: rose window
+vec3 scMask(vec2 p, float t){
+  vec2 c=uP0.xy; float R=uP0.z;
+  vec3 col=mix(vec3(.05,.0,.014), vec3(.006,0.,.004), smoothstep(150.,1000.,p.y));
+  col+=vec3(.2,.02,.05)*exp(-length(p-c)/680.)*.9;
+  vec2 v=p-c; float r=length(v); float a=atan(v.y,v.x);
+  float N=12., seg=6.2831853/N;
+  float fa=mod(a+seg*.5, seg)-seg*.5;
+  vec2 fp=vec2(cos(fa),sin(fa))*r;
+  if(r<R+8.){
+    float tr=abs(r-R*.2);
+    tr=min(tr, abs(r-R*.52)); tr=min(tr, abs(r-R));
+    if(r>R*.2) tr=min(tr, abs(fp.y));
+    tr=min(tr, abs(length(fp-vec2(R*.76,0.))-R*.19));
+    tr=min(tr, abs(length(fp-vec2(R*.36,0.))-R*.1));
+    tr=min(tr, abs(length(fp-vec2(R*.76,0.))-R*.06));
+    float line=1.-smoothstep(2.5,5.,tr);
+    float ring=floor(r/(R*.26));
+    float id=floor((a+3.14159)/seg+.5)+ring*17.+step(R*.76, length(fp-vec2(R*.76,0.))+R*.57)*5.;
+    float hh=h11(id*3.7+1.);
+    vec3 g=hh<.35? vec3(.78,.06,.12) : hh<.6? vec3(.42,.08,.58) : hh<.85? vec3(.1,.2,.62) : vec3(1.,.64,.16);
+    g*=.55+.45*vn(p/9.+t*.05);
+    g*=1.65-r/R*.6;
+    vec3 win=g*1.45*(.85+.15*sin(t*.7+r*.02));
+    win=mix(win, vec3(1.,.95,.9)*1.7, smoothstep(R*.19,R*.1,r));
+    col=mix(col, win, 1.-smoothstep(R-1.,R+1.,r));
+    col=mix(col, vec3(.016,0.,.006), line);
+  }
+  col+=vec3(.95,.2,.28)*exp(-max(r-R,0.)/80.)*.28*step(R,r);
+  vec2 sv=p-c;
+  if(sv.y>0.){ float w=R*.55+sv.y*.32;
+    float sh=exp(-pow(sv.x/w,2.))*exp(-sv.y/900.);
+    float rays=.5+.5*fbm3(vec2(atan(sv.x,sv.y)*14., t*.08));
+    col+=vec3(.8,.18,.3)*sh*rays*.2; }
+  float sm=fbm(vec2(p.x/300.+t*.03, p.y/80.-t*.02));
+  col+=vec3(.28,.05,.09)*sm*smoothstep(650.,1000.,p.y)*.55;
+  if(p.y>905.){
+    vec2 q=vec2(p.x, 2.*905.-p.y);
+    vec2 rv=q-c; float rr=length(rv);
+    col+=vec3(.9,.3,.4)*exp(-max(rr-R,0.)/120.)*.12*exp(-(p.y-905.)/80.);
+    col=mix(col, col*.6+vec3(.02,0.,.01), .5);
+  }
+  return col;
+}
+// ── 6 starry hill / dawn
+vec3 scStars(vec2 p, float t){
+  float dawn=uP0.x, close=uP0.y, aur=uP0.z;
+  float y=p.y/1080.;
+  vec2 sp=par(p,.12);
+  vec3 col=mix(vec3(.008,.014,.042), vec3(.03,.075,.15), smoothstep(.05,.85,sp.y/1080.));
+  vec2 mw=sp-vec2(980.,380.);
+  float ca=cos(-.42), sa=sin(-.42);
+  mw=vec2(ca*mw.x-sa*mw.y, sa*mw.x+ca*mw.y);
+  float band=exp(-pow(mw.y/(150.+40.*sin(mw.x/400.)),2.));
+  float cl=fbm(mw/170.+2.);
+  float dust=smoothstep(.45,.7,fbm(mw/75.+9.));
+  vec3 mwc=mix(vec3(.18,.22,.5), vec3(.62,.48,.68), fbm(mw/50.));
+  col+=mwc*band*cl*1.05*(1.-.75*dust*band);
+  col+=vec3(.9,.8,.7)*pow(band,3.)*cl*cl*.25;
+  float sd=1.+band*1.6;
+  vec3 st=stars(sp,19.,.26*sd,1.,t)+stars(sp+vec2(211.,77.),47.,.55,1.5,t)+stars(sp+vec2(93.,151.),9.,.12*sd,.45,t);
+  col+=st*(1.-close*.6);
+  for(int i=0;i<2;i++){
+    float fi=float(i), ph=fi*3.14159;
+    float yc=300.+70.*sin(sp.x/310.+t*.12+ph)+30.*sin(sp.x/130.-t*.2+ph*1.3);
+    float dy=sp.y-yc;
+    float curtain=exp(-max(dy,0.)/16.)*exp(-max(-dy,0.)/150.);
+    float streak=.5+.5*fbm3(vec2(sp.x/22.+t*.3*(fi*2.-1.), t*.1+fi*5.));
+    float fold=.6+.4*sin(sp.x/60.+t*.5+fi*2.);
+    vec3 ac=i==0? vec3(.38,.58,1.) : vec3(.36,1.,.68);
+    col+=ac*curtain*streak*fold*.4*aur;
+  }
+  for(int i=0;i<4;i++){
+    vec4 m=uMet[i]; float age=t-m.z;
+    if(age>0. && age<1.3){
+      vec2 dir=vec2(cos(m.w),sin(m.w));
+      vec2 head=m.xy+dir*age*950.;
+      float len=260.*min(age*3.,1.);
+      vec2 v=sp-head; float al=-dot(v,dir); float pe=abs(v.x*dir.y-v.y*dir.x);
+      float tail=step(0.,al)*smoothstep(len,0.,al)*exp(-pe*pe/2.5);
+      float life=smoothstep(1.3,.65,age);
+      col+=vec3(.85,.93,1.)*(tail*.9+exp(-dot(v,v)/10.)*2.)*life;
+    }
+  }
+  vec3 dc=mix(vec3(.16,.2,.44), vec3(.62,.42,.6), smoothstep(.1,.55,y));
+  dc=mix(dc, vec3(1.,.62,.46), smoothstep(.5,.72,y));
+  dc=mix(dc, vec3(1.,.87,.64), smoothstep(.68,.78,y));
+  vec2 sun=uP1.xy; float sd2=length(p-sun);
+  dc+=vec3(1.,.72,.45)*exp(-sd2/400.)*.6 + vec3(1.,.9,.72)*exp(-sd2/80.)*.8;
+  float dcl=fbm(vec2(sp.x/520.+t*.006, sp.y/90.));
+  dc=mix(dc, mix(vec3(.55,.36,.55), vec3(1.,.72,.55), exp(-abs(sp.x-sun.x)/600.)), smoothstep(.55,.8,dcl)*smoothstep(.15,.3,y)*smoothstep(.62,.42,y)*.8);
+  dc=mix(dc, vec3(1.,.96,.86)*2.5, smoothstep(40.,36.,sd2));
+  col=mix(col, dc+st*.04, smoothstep(0.,1.,dawn));
+  vec2 m1=par(p,.3); float hm=790.+55.*ridge(m1.x/380.,21.);
+  vec3 mc=mix(vec3(.02,.035,.075), vec3(.45,.3,.42), dawn);
+  col=mix(col, mc, cover(m1.y-hm));
+  col+=mix(vec3(.05,.12,.2), vec3(1.,.6,.42), dawn)*exp(-abs(p.y-790.)/70.)*.3;
+  if(close>0.){
+    vec3 bok=vec3(0.);
+    for(int i=0;i<2;i++){
+      float cs=i==0?150.:240.;
+      vec2 bq=p+vec2(t*(8.+float(i)*5.), 0.);
+      vec2 g=floor(bq/cs), f=fract(bq/cs);
+      vec2 c=.25+.5*h22(g+float(i)*31.);
+      float r=(.25+.2*h12(g+7.))*cs*.5;
+      float dd=length((f-c)*cs);
+      float disc=smoothstep(r,r*.8,dd)*(.5+.5*smoothstep(r*.4,r,dd));
+      vec3 kc=mix(vec3(.4,.6,1.), vec3(.45,1.,.7), step(.5,h12(g+2.)));
+      bok+=kc*disc*step(.55,h12(g+40.))*(.5+.5*sin(t*.8+h12(g)*30.));
+    }
+    col=mix(col, col*.5+bok*.25, close);
+  }
+  return col;
+}
+void main(){
+  vec2 f=vec2(gl_FragCoord.x, uRes.y-gl_FragCoord.y);
+  vec2 p=(f-uView.xy)/uView.z;
+  vec3 c;
+  if(uScene==0) c=scPrologue(p,uT);
+  else if(uScene==1) c=scDusk(p,uT);
+  else if(uScene==2) c=scWalk(p,uT);
+  else if(uScene==3) c=scStage(p,uT);
+  else if(uScene==4) c=scRain(p,uT);
+  else if(uScene==5) c=scMask(p,uT);
+  else c=scStars(p,uT);
+  o=vec4(c,1.);
+}`;
+
+// ---------------------------------------------------------------- 2D layer composite (rim light + reflection + emissive)
+const FS_LAYER = `#version 300 es
+precision highp float;
+in vec2 vUv; out vec4 o;
+uniform sampler2D uL, uE; uniform vec2 uTx; uniform vec2 uLight;
+uniform vec3 uAmb, uRim; uniform float uRimW, uOmni, uEmis, uReflY, uReflK, uRip, uT;
+vec4 lit(vec2 uv){
+  vec4 c=texture(uL,uv);
+  if(c.a<.002) return vec4(0.);
+  vec2 px=uv/uTx;
+  vec2 dir=normalize(uLight-px+vec2(1e-3));
+  float a1=texture(uL, uv+dir*uTx*uRimW).a, a2=texture(uL, uv+dir*uTx*uRimW*2.3).a;
+  float dr=clamp(c.a-(a1*.6+a2*.4),0.,1.);
+  float s=texture(uL,uv+vec2(uRimW,0.)*uTx).a+texture(uL,uv-vec2(uRimW,0.)*uTx).a+texture(uL,uv+vec2(0.,uRimW)*uTx).a+texture(uL,uv-vec2(0.,uRimW)*uTx).a;
+  float om=clamp(c.a-s*.25,0.,1.);
+  float rim=max(dr, om*uOmni);
+  vec3 alb=c.rgb/c.a;
+  float mx=max(max(alb.r,alb.g),max(alb.b,.05));
+  vec3 tint=mix(vec3(1.), alb/mx, .55);
+  float far=exp(-length(uLight-px)*uTx.y*.9);
+  vec3 col=alb*uAmb*(1.+far*.25)+rim*uRim*tint*1.6;
+  return vec4(col*c.a, c.a);
+}
+void main(){
+  vec4 r=lit(vUv);
+  vec2 px=vUv/uTx;
+  if(uReflY>0. && px.y<uReflY){
+    float dy=uReflY-px.y;
+    vec2 ruv=vec2(px.x+sin(px.y*.21+uT*4.)*uRip, uReflY+dy*1.02)*uTx;
+    vec4 rc=texture(uL, ruv);
+    if(rc.a>.002){ vec3 alb=rc.rgb/rc.a; float k=uReflK*exp(-dy*uTx.y*5.);
+      r=r+vec4(alb*uAmb*.8*rc.a*k, rc.a*k)*(1.-r.a); }
+  }
+  if(uEmis>0.){ vec4 e=texture(uE,vUv); r.rgb+=e.rgb*uEmis;
+    if(uReflY>0. && px.y<uReflY){ float dy=uReflY-px.y; vec4 re=texture(uE, vec2(px.x, uReflY+dy)*uTx); r.rgb+=re.rgb*uEmis*uReflK*.5*exp(-dy*uTx.y*5.); } }
+  o=r;
+}`;
+
+// ---------------------------------------------------------------- particles (GPU-driven)
+const VS_PART = `#version 300 es
+precision highp float;
+in vec2 aQ; in vec4 aS;
+uniform vec2 uRes; uniform vec3 uView; uniform vec3 uCam; uniform float uT; uniform int uType; uniform vec4 uP, uP2; uniform vec4 uVis;
+out vec2 vQ; out vec4 vC; flat out int vK;
+vec2 toClip(vec2 d){ vec2 px=d*uView.z+uView.xy; return vec2(px.x/uRes.x*2.-1., 1.-px.y/uRes.y*2.); }
+vec2 camT(vec2 w){ return (w-uCam.xy)*uCam.z+vec2(960.,540.); }
+void main(){
+  vec4 s=aS; float t=uT;
+  float W=uVis.z-uVis.x+120., H=uVis.w-uVis.y+120.;
+  vec2 pos=vec2(0.); vec2 sz=vec2(4.); float rot=0.; vec4 col=vec4(1.); int k=0;
+  if(uType==0){ // warm dust motes
+    pos=vec2(uVis.x-60.+mod(s.x*W+t*(8.+14.*s.z)+30.*sin(t*.3+s.w*6.28), W), uVis.y-60.+mod(s.y*H-t*(5.+10.*s.w), H));
+    sz=vec2(1.5+4.*s.z*s.z); col=vec4(1.,.82,.58, (.25+.5*s.w)*(.5+.5*sin(t*(1.+s.x*2.)+s.y*20.))*uP.x);
+  } else if(uType==1){ // fireflies
+    vec2 base=mix(uP2.xy, uP2.zw, s.xy);
+    pos=camT(base+vec2(55.*sin(t*.23*(1.+s.z)+s.w*30.), 32.*sin(t*.31*(1.+s.w)+s.z*20.)));
+    float bl=pow(.5+.5*sin(t*(.8+1.2*s.z)+s.x*40.),3.);
+    sz=vec2(4.+6.*s.z)*uCam.z;
+    vec3 c=uP.y<.5? mix(vec3(.82,1.,.45), vec3(1.,.9,.5), s.w) : (s.w<.5? vec3(.55,.72,1.) : vec3(.55,1.,.75));
+    col=vec4(c, bl*uP.x);
+  } else if(uType==2 || uType==4){ // petals (sakura / rose)
+    float fall=uType==2? 45.+55.*s.y : 32.+40.*s.y;
+    float y=uVis.y-60.+mod(s.y*H*1.3+t*fall, H);
+    float x=uVis.x-60.+mod(s.x*W+t*uP.y+50.*sin(t*.7+s.w*6.28)-(uCam.x-960.)*uP.z*(.6+.6*s.z), W);
+    pos=vec2(x,y);
+    float base=uType==2? 6.+7.*s.z : 9.+9.*s.z;
+    sz=vec2(base*(.25+.75*abs(cos(t*(1.3+s.x*2.)+s.y*9.))), base)*uP.w;
+    rot=t*(.6+s.z)+s.w*6.28;
+    vec3 c=uType==2? mix(vec3(1.,.7,.8), vec3(1.,.88,.92), s.x) : mix(vec3(.5,.02,.08), vec3(.85,.12,.2), s.x);
+    col=vec4(c, (.7+.3*s.w)*uP.x); k=1;
+  } else if(uType==3){ // rain streaks
+    float sp=1300.+900.*s.z;
+    pos=vec2(uVis.x-60.+mod(s.x*W+t*uP.y, W), uVis.y-60.+mod(s.y*H+t*sp, H));
+    sz=vec2(.7+1.1*s.z, 14.+34.*s.z);
+    rot=atan(uP.y, sp);
+    float ld=length(pos-uP2.xy);
+    vec3 c=vec3(.62,.72,.95)+vec3(1.,.8,.5)*exp(-ld/230.)*2.2;
+    col=vec4(c, (.1+.24*s.z)*uP.x); k=2;
+  } else if(uType==5){ // penlights
+    float row=floor(s.y*3.);
+    vec2 piv=vec2(uVis.x+s.x*(W-120.), 1000.+row*34.+s.z*14.);
+    float a=sin(uP.y*3.14159+s.z*1.4+row)*.55;
+    pos=piv+vec2(sin(a),-cos(a))*22.;
+    sz=vec2(3.6, 22.); rot=-a;
+    vec3 c=s.w<.3? vec3(.45,.65,1.) : s.w<.6? vec3(.45,1.,.7) : s.w<.85? vec3(1.,.5,.8) : vec3(1.,.95,.85);
+    col=vec4(c*1.4, uP.x*(.6+.4*s.y)); k=2;
+  } else if(uType==6){ // shards
+    float age=t-uP.y;
+    float ang=s.x*6.2832, spd=220.+780.*s.y;
+    vec2 w=uP2.xy+vec2(cos(ang),sin(ang))*spd*age*(1.-.22*age)+vec2(0.,160.*age*age);
+    pos=camT(w);
+    sz=vec2(5.+16.*s.z)*uCam.z*(age>0.?1.:0.);
+    rot=s.z*6.28+age*(s.w-.5)*14.;
+    col=vec4(mix(vec3(1.,.95,.9), vec3(1.,.8,.55), s.w), clamp(1.-age/2.4,0.,1.)*uP.x); k=3;
+  } else if(uType==7){ // rising motes
+    float ph=fract(t*.065*(1.+s.z)+s.y);
+    vec2 w=vec2(mix(uP2.x,uP2.z,s.x)+42.*sin(ph*12.+s.w*6.28), uP2.w-ph*720.);
+    pos=camT(w);
+    sz=vec2(3.+5.*s.z)*uCam.z;
+    col=vec4(s.w<.5? vec3(.55,.72,1.) : vec3(.55,1.,.76), sin(ph*3.14159)*uP.x);
+  }
+  vec2 q=aQ*sz; float cr=cos(rot), sr=sin(rot); q=vec2(cr*q.x-sr*q.y, sr*q.x+cr*q.y);
+  gl_Position=vec4(toClip(pos+q),0.,1.);
+  vQ=aQ; vC=col; vK=k;
+}`;
+const FS_PART = `#version 300 es
+precision highp float;
+in vec2 vQ; in vec4 vC; flat in int vK; out vec4 o;
+void main(){
+  if(vK==0){ float d=length(vQ); float a=exp(-d*d*4.)*smoothstep(1.,.5,d); o=vec4(vC.rgb*a*vC.a, 0.); }
+  else if(vK==1){ vec2 q=vQ; q.y+=.12; float d=length(q*vec2(1.,.8));
+    float notch=length(vec2(q.x*1.5, q.y-1.));
+    float sh=smoothstep(1.,.82,d)*smoothstep(.12,.32,notch);
+    vec3 c=mix(vC.rgb, vec3(1.), smoothstep(.85,0.,d)*.3);
+    o=vec4(c*sh*vC.a, sh*vC.a); }
+  else if(vK==2){ float a=smoothstep(1.,0.,abs(vQ.x))*smoothstep(1.,.3,abs(vQ.y)); o=vec4(vC.rgb*a*vC.a, 0.); }
+  else { vec2 q=vQ; float d=max(abs(q.x)*1.6+q.y*.9, -q.y)-.55; float a=smoothstep(.06,-.04,d);
+    o=vec4(vC.rgb*a*vC.a, a*vC.a*.85); }
+}`;
+
+// ---------------------------------------------------------------- flares (CPU-listed sprites)
+const VS_FLARE = `#version 300 es
+precision highp float;
+in vec2 aQ; in vec4 aA; in vec4 aB;
+uniform vec2 uRes; uniform vec3 uView;
+out vec2 vQ; out vec4 vC; flat out int vK;
+void main(){
+  vec2 sz=vec2(aA.z); int k=int(aB.w+.5); if(k==2) sz.x*=5.;
+  vec2 d=aA.xy+aQ*sz; vec2 px=d*uView.z+uView.xy;
+  gl_Position=vec4(px.x/uRes.x*2.-1., 1.-px.y/uRes.y*2., 0., 1.);
+  vQ=aQ; vC=vec4(aB.rgb, aA.w); vK=k;
+}`;
+const FS_FLARE = `#version 300 es
+precision highp float;
+in vec2 vQ; in vec4 vC; flat in int vK; out vec4 o;
+void main(){
+  float d=length(vQ); float g;
+  if(vK==2) g=exp(-abs(vQ.y)*22.)*exp(-abs(vQ.x)*2.2)*.8 + exp(-d*d*18.)*.6;
+  else { g=exp(-d*d*6.)*.85+exp(-d*3.)*.22;
+    if(vK==1) g+=(exp(-abs(vQ.x)*55.)*exp(-abs(vQ.y)*2.4)+exp(-abs(vQ.y)*55.)*exp(-abs(vQ.x)*2.4))*.55; }
+  g*=smoothstep(1.,.8,max(abs(vQ.x),abs(vQ.y)));
+  o=vec4(vC.rgb*g*vC.a, 0.);
+}`;
+
+// ---------------------------------------------------------------- dissolve between two scenes
+const FS_MIX = GLSL_COMMON + `
+in vec2 vUv; out vec4 o;
+uniform sampler2D uA, uB; uniform float uK; uniform vec3 uEdge;
+void main(){
+  vec3 a=texture(uA,vUv).rgb, b=texture(uB,vUv).rgb;
+  float n=fbm(vUv*vec2(uRes.x/uRes.y,1.)*2.6)*.8+(1.-vUv.y)*.2;
+  float th=uK*1.3-.15;
+  float m=smoothstep(th-.05, th+.05, n);
+  vec3 c=mix(b,a,m);
+  c+=uEdge*exp(-abs(n-th)*38.)*(1.-abs(uK*2.-1.))*1.2;
+  o=vec4(c,1.);
+}`;
+
+const FS_BRIGHT = `#version 300 es
+precision highp float; in vec2 vUv; out vec4 o; uniform sampler2D uS; uniform float uTh;
+void main(){ vec3 c=texture(uS,vUv).rgb; float l=max(c.r,max(c.g,c.b)); o=vec4(c*smoothstep(uTh,uTh+.55,l),1.); }`;
+const FS_BLUR = `#version 300 es
+precision highp float; in vec2 vUv; out vec4 o; uniform sampler2D uS; uniform vec2 uD;
+void main(){ vec3 s=texture(uS,vUv).rgb*.227027;
+  s+=(texture(uS,vUv+uD*1.3846).rgb+texture(uS,vUv-uD*1.3846).rgb)*.3162162;
+  s+=(texture(uS,vUv+uD*3.2308).rgb+texture(uS,vUv-uD*3.2308).rgb)*.0702703; o=vec4(s,1.); }`;
+
+const FS_FINAL = GLSL_COMMON + `
+in vec2 vUv; out vec4 o;
+uniform sampler2D uS, uB1, uB2;
+uniform float uT, uBloom, uExpo, uSat, uGamma, uVig, uGrain, uFadeB, uFadeW, uCA, uLens, uLeak, uBox;
+uniform vec3 uLift, uGain;
+float drops(vec2 uv, float t){
+  vec2 g=uv*vec2(26.,14.); vec2 id=floor(g); vec2 f=fract(g)-.5;
+  vec3 n=h32(id);
+  vec2 c=(n.xy-.5)*.6; float r=.16+.18*n.z;
+  float life=fract(t*.07+n.z*7.);
+  float d=length((f-c)*vec2(1.,1.15));
+  float s=smoothstep(r,r*.3,d)*smoothstep(0.,.1,life)*smoothstep(1.,.7,life)*step(.45,n.x);
+  vec2 g2=uv*vec2(9.,1.); float col=floor(g2.x); vec3 m=h32(vec2(col,3.));
+  float y=fract(-t*(.06+.08*m.x)+m.y);
+  vec2 f2=vec2(fract(g2.x)-.5-(m.z-.5)*.5, (uv.y-y)*9.);
+  float slide=smoothstep(.22,.05,length(f2*vec2(1.,1.4)))*step(.6,m.z);
+  float trail=smoothstep(.06,.0,abs(f2.x))*smoothstep(0.,1.5,f2.y)*smoothstep(5.,1.5,f2.y)*step(.6,m.z)*.35;
+  return max(s, max(slide, trail));
+}
+vec3 tm(vec3 c){ float m=max(c.r,max(c.g,c.b)); if(m>.78){ float k=.78+.22*(1.-exp(-(m-.78)/.22)); c*=k/m; c=mix(c, vec3(k), smoothstep(1.2,3.5,m)*.5);} return c; }
+void main(){
+  vec2 uv=vUv;
+  float asp=uRes.x/uRes.y;
+  if(uLens>0.){ vec2 lu=vec2(uv.x*asp, uv.y)*1.;
+    float e=.0025; float h=drops(lu,uT);
+    vec2 nrm=vec2(drops(lu+vec2(e,0.),uT)-h, drops(lu+vec2(0.,e),uT)-h);
+    uv+=nrm*uLens*6.; }
+  vec3 c;
+  if(uCA>0.){ vec2 dc=(uv-.5)*uCA; c=vec3(texture(uS,uv+dc).r, texture(uS,uv).g, texture(uS,uv-dc).b); }
+  else c=texture(uS,uv).rgb;
+  c+=(texture(uB1,uv).rgb*.65+texture(uB2,uv).rgb*.9)*uBloom;
+  c*=uExpo;
+  c=tm(c);
+  c=pow(max(c,0.), vec3(uGamma))*uGain+uLift*(1.-c);
+  float l=dot(c,vec3(.299,.587,.114)); c=mix(vec3(l), c, uSat);
+  vec2 vq=(vUv-.5)*vec2(asp*.75,1.);
+  c*=mix(1., smoothstep(1.05,.2,length(vq)), uVig);
+  if(uLeak>0.){ float lk=fbm3(vec2(vUv.x*1.4+uT*.035, vUv.y*1.1-uT*.02));
+    float edge=pow(abs(vUv.x-.5)*2.,2.2);
+    c+=vec3(1.,.48,.22)*pow(lk,2.5)*edge*uLeak*.55+vec3(1.,.4,.55)*pow(fbm3(vUv*2.+uT*.05+9.),3.)*uLeak*.08; }
+  c+=(h12(gl_FragCoord.xy+fract(uT*7.13)*511.)-.5)*uGrain;
+  c=mix(c, vec3(0.), uFadeB); c=mix(c, vec3(1.), uFadeW);
+  vec2 f=vec2(gl_FragCoord.x, uRes.y-gl_FragCoord.y); float dy=(f.y-uView.y)/uView.z;
+  float bar=100.*uBox; float b=smoothstep(bar-1.2/uView.z, bar, dy)*smoothstep(1080.-bar+1.2/uView.z, 1080.-bar, dy);
+  c*=b;
+  c+=(h12(gl_FragCoord.xy*1.37)-.5)/255.;
+  o=vec4(clamp(c,0.,1.),1.);
+}`;
+
+// ---------------------------------------------------------------- GL helper
+class Renderer {
+  constructor(canvas, test) {
+    const gl = canvas.getContext('webgl2', { antialias: false, alpha: false, depth: false, stencil: false, premultipliedAlpha: false, preserveDrawingBuffer: !!test, powerPreference: 'high-performance' });
+    if (!gl) throw new Error('webgl2');
+    this.gl = gl; this.canvas = canvas;
+    this.half = !!gl.getExtension('EXT_color_buffer_float') || !!gl.getExtension('EXT_color_buffer_half_float');
+    gl.getExtension('OES_texture_float_linear');
+    const tri = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, tri); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    this.fsVao = gl.createVertexArray(); gl.bindVertexArray(this.fsVao); gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    const P = (vs, fs, attrs) => this.prog(vs, fs, attrs);
+    this.pBg = P(VS_FS, FS_BG, ['aP']); this.pLayer = P(VS_FS, FS_LAYER, ['aP']); this.pMix = P(VS_FS, FS_MIX, ['aP']);
+    this.pBright = P(VS_FS, FS_BRIGHT, ['aP']); this.pBlur = P(VS_FS, FS_BLUR, ['aP']); this.pFinal = P(VS_FS, FS_FINAL, ['aP']);
+    this.pPart = P(VS_PART, FS_PART, ['aQ', 'aS']); this.pFlare = P(VS_FLARE, FS_FLARE, ['aQ', 'aA', 'aB']);
+    // quad + instance data
+    const quad = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, quad); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+    const N = 3000, seeds = new Float32Array(N * 4); const r = mulberry32(99); for (let i = 0; i < N * 4; i++) seeds[i] = r();
+    const sb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, sb); gl.bufferData(gl.ARRAY_BUFFER, seeds, gl.STATIC_DRAW);
+    this.partVao = gl.createVertexArray(); gl.bindVertexArray(this.partVao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, quad); gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, sb); gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 0, 0); gl.vertexAttribDivisor(1, 1);
+    this.flareData = new Float32Array(256 * 8);
+    this.flareBuf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, this.flareBuf); gl.bufferData(gl.ARRAY_BUFFER, this.flareData.byteLength, gl.DYNAMIC_DRAW);
+    this.flareVao = gl.createVertexArray(); gl.bindVertexArray(this.flareVao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, quad); gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.flareBuf);
+    gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 32, 0); gl.vertexAttribDivisor(1, 1);
+    gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 4, gl.FLOAT, false, 32, 16); gl.vertexAttribDivisor(2, 1);
+    gl.bindVertexArray(null);
+    this.texL = this.tex(); this.texE = this.tex();
+    this.W = 0; this.H = 0;
+  }
+  prog(vs, fs, attrs) {
+    const gl = this.gl;
+    const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { const log = gl.getShaderInfoLog(s); console.error(log, src.split('\n').map((l, i) => (i + 1) + ': ' + l).join('\n')); throw new Error('shader: ' + log); } return s; };
+    const p = gl.createProgram(); gl.attachShader(p, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs));
+    attrs.forEach((a, i) => gl.bindAttribLocation(p, i, a)); gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error('link: ' + gl.getProgramInfoLog(p));
+    p.loc = {}; const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+    for (let i = 0; i < n; i++) { const info = gl.getActiveUniform(p, i); p.loc[info.name.replace(/\[0\]$/, '')] = { l: gl.getUniformLocation(p, info.name), type: info.type }; }
+    return p;
+  }
+  tex() { const gl = this.gl, t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); return t; }
+  rt(w, h) {
+    const gl = this.gl, t = this.tex();
+    if (this.half) gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
+    else gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    const fb = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, fb); gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE && this.half) { this.half = false; gl.deleteFramebuffer(fb); gl.deleteTexture(t); return this.rt(w, h); }
+    return { fb, t, w, h };
+  }
+  resize(W, H) {
+    if (W === this.W && H === this.H) return;
+    const gl = this.gl; this.W = W; this.H = H; this.canvas.width = W; this.canvas.height = H;
+    for (const k of ['A', 'B', 'M', 'h', 'q1', 'q2', 'e1', 'e2']) if (this[k]) { gl.deleteFramebuffer(this[k].fb); gl.deleteTexture(this[k].t); }
+    this.A = this.rt(W, H); this.B = this.rt(W, H); this.M = this.rt(W, H);
+    const h = [Math.max(1, W >> 1), Math.max(1, H >> 1)], q = [Math.max(1, W >> 2), Math.max(1, H >> 2)], e = [Math.max(1, W >> 3), Math.max(1, H >> 3)];
+    this.h = this.rt(...h); this.q1 = this.rt(...q); this.q2 = this.rt(...q); this.e1 = this.rt(...e); this.e2 = this.rt(...e);
+  }
+  use(p, u) {
+    const gl = this.gl; gl.useProgram(p); let unit = 0;
+    for (const k in u) {
+      const L = p.loc[k]; if (!L) continue; const v = u[k];
+      if (v && v.tex !== undefined) { gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, v.tex); gl.uniform1i(L.l, unit++); continue; }
+      switch (L.type) {
+        case gl.FLOAT: gl.uniform1f(L.l, v); break;
+        case gl.INT: gl.uniform1i(L.l, v); break;
+        case gl.FLOAT_VEC2: gl.uniform2fv(L.l, v); break;
+        case gl.FLOAT_VEC3: gl.uniform3fv(L.l, v); break;
+        case gl.FLOAT_VEC4: gl.uniform4fv(L.l, v.length % 4 ? [...v, 0, 0, 0].slice(0, 4) : v); break;
+      }
+    }
+  }
+  target(rt) { const gl = this.gl; if (rt) { gl.bindFramebuffer(gl.FRAMEBUFFER, rt.fb); gl.viewport(0, 0, rt.w, rt.h); } else { gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, this.W, this.H); } }
+  fs() { const gl = this.gl; gl.bindVertexArray(this.fsVao); gl.drawArrays(gl.TRIANGLES, 0, 3); }
+  upload(t, canvas) { const gl = this.gl; gl.bindTexture(gl.TEXTURE_2D, t); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, canvas); gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false); gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false); }
+  blend(mode) { const gl = this.gl; if (!mode) { gl.disable(gl.BLEND); return; } gl.enable(gl.BLEND); if (mode === 'add') gl.blendFunc(gl.ONE, gl.ONE); else gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); }
+  particles(common, list) {
+    const gl = this.gl; gl.useProgram(this.pPart); gl.bindVertexArray(this.partVao);
+    for (const p of list) {
+      if (!p.n || (p.p && p.p[0] <= 0)) continue;
+      this.use(this.pPart, Object.assign({}, common, { uType: p.type, uP: p.p || [1, 0, 0, 1], uP2: p.p2 || [0, 0, 0, 0] }));
+      this.blend(p.type === 2 || p.type === 4 || p.type === 6 ? 'over' : 'add');
+      gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, Math.min(3000, p.n));
+    }
+  }
+  flares(common, list) {
+    if (!list.length) return; const gl = this.gl, d = this.flareData; const n = Math.min(256, list.length);
+    for (let i = 0; i < n; i++) { const f = list[i]; d.set([f[0], f[1], f[2], f[3], f[4], f[5], f[6], f[7] || 0], i * 8); }
+    gl.bindBuffer(gl.ARRAY_BUFFER, this.flareBuf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, d.subarray(0, n * 8));
+    this.use(this.pFlare, common); this.blend('add'); gl.bindVertexArray(this.flareVao); gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, n);
+  }
+}
+
+// =====================================================================
+//  2D ART — posable silhouette puppets, props, scenery (Canvas2D)
+//  Drawn as albedo; the WebGL layer pass adds ambient + rim lighting.
+// =====================================================================
+const TAU = Math.PI * 2;
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+const ss = (a, b, x) => { const t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+const easeIO = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+function kf(t, keys, ease = easeIO) {
+  if (t <= keys[0][0]) return keys[0][1];
+  for (let i = 1; i < keys.length; i++) if (t <= keys[i][0]) {
+    const [ta, va] = keys[i - 1], [tb2, vb] = keys[i]; const u = ease((t - ta) / (tb2 - ta));
+    return Array.isArray(va) ? va.map((x, j) => lerp(x, vb[j], u)) : lerp(va, vb, u);
+  }
+  return keys[keys.length - 1][1];
+}
+
+const RIG = {
+  teen: { headY: -458, hrx: 33, hry: 37, neckTop: -425, neckBot: -404, neckW: 12, shY: -400, shW: 37, chestW: 31, waistY: -318, waistW: 23, hipY: -290, hipW: 32, hemY: -194, hemW: 64, depth: 15, legW: 18, calfW: 13.5, thigh: 148, shin: 140, upper: 82, fore: 76, armW: 12, foreW: 9.5, handR: 7.5, footL: 26, tailL: 262, tailW: 18, hairLen: 128, sitH: 16, bow: 1 },
+  child: { headY: -262, hrx: 40, hry: 43, neckTop: -222, neckBot: -211, neckW: 11, shY: -210, shW: 27, chestW: 25, waistY: -170, waistW: 22, hipY: -150, hipW: 24, hemY: -86, hemW: 48, depth: 13, legW: 12, calfW: 10, thigh: 76, shin: 70, upper: 50, fore: 46, armW: 10.5, foreW: 9, handR: 7, footL: 19, tailL: 150, tailW: 14, hairLen: 70, sitH: 14, bow: .85 },
+};
+const PAL = {
+  saki: { hair: '#a8bdea', hairSh: '#8ba1d4', eye: '#d9a43f' },
+  mutsu: { hair: '#afdcb7', hairSh: '#90c19c', eye: '#e4c04d' },
+  skin: '#f5ddd3', skinSh: '#e6c3b6', lash: '#2a2232', ribbon: '#17161f',
+};
+const OUT = {
+  uniform: { top: '#2c3152', skirt: '#2c3152', collar: '#e8ebf3', scarf: '#9c2f46', sock: '#1f2031', shoe: '#1a1a22', longSleeve: true },
+  childS: { top: '#34436f', skirt: '#34436f', collar: '#eef1f7', sock: '#eeeeee', shoe: '#3b2a2c', longSleeve: false },
+  childM: { top: '#eef0e8', skirt: '#eef0e8', collar: '#cfe2cf', sock: '#eeeeee', shoe: '#6c4c3c', longSleeve: false },
+  gownS: { top: '#202339', skirt: '#202339', collar: '#d9dff0', accent: '#56679f', sock: '#111', shoe: '#111', longSleeve: true, gown: true },
+  gownM: { top: '#1c2b25', skirt: '#1c2b25', collar: '#d6e4d7', accent: '#4c7a60', sock: '#111', shoe: '#111', longSleeve: true, gown: true },
+};
+const _shc = {};
+function shade(c, k) {
+  const key = c + k; if (_shc[key]) return _shc[key];
+  const n = parseInt(c.slice(1), 16);
+  return _shc[key] = `rgb(${Math.round(((n >> 16) & 255) * k)},${Math.round(((n >> 8) & 255) * k)},${Math.round((n & 255) * k)})`;
+}
+
+// ---------------------------------------------------------------- primitives
+function seg(g, a, b, wa, wb, col) {
+  const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1e-3, nx = -dy / L, ny = dx / L, an = Math.atan2(ny, nx);
+  g.fillStyle = col; g.beginPath();
+  g.moveTo(a[0] + nx * wa / 2, a[1] + ny * wa / 2); g.lineTo(b[0] + nx * wb / 2, b[1] + ny * wb / 2);
+  g.arc(b[0], b[1], wb / 2, an, an - Math.PI, true);
+  g.lineTo(a[0] - nx * wa / 2, a[1] - ny * wa / 2);
+  g.arc(a[0], a[1], wa / 2, an + Math.PI, an, true);
+  g.closePath(); g.fill();
+}
+function ik(s, t, l1, l2, bend) {
+  let dx = t[0] - s[0], dy = t[1] - s[1], d = Math.hypot(dx, dy);
+  const mx = (l1 + l2) * .995; if (d > mx) { dx *= mx / d; dy *= mx / d; d = mx; }
+  const a = Math.atan2(dy, dx); d = Math.max(d, Math.abs(l1 - l2) + 1);
+  const A = Math.acos(clamp((l1 * l1 + d * d - l2 * l2) / (2 * l1 * d), -1, 1));
+  return [[s[0] + Math.cos(a + bend * A) * l1, s[1] + Math.sin(a + bend * A) * l1], [s[0] + Math.cos(a) * d, s[1] + Math.sin(a) * d]];
+}
+function strand(g, pts, wf, col) {
+  const n = pts.length, L = [], Rr = [];
+  for (let i = 0; i < n; i++) {
+    const p = pts[i], a = pts[Math.max(0, i - 1)], b = pts[Math.min(n - 1, i + 1)];
+    const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1, nx = -dy / l, ny = dx / l, w = wf(i / (n - 1)) / 2;
+    L.push([p[0] + nx * w, p[1] + ny * w]); Rr.push([p[0] - nx * w, p[1] - ny * w]);
+  }
+  g.fillStyle = col; g.beginPath(); g.moveTo(L[0][0], L[0][1]);
+  for (let i = 1; i < n; i++) g.quadraticCurveTo(L[i - 1][0], L[i - 1][1], (L[i - 1][0] + L[i][0]) / 2, (L[i - 1][1] + L[i][1]) / 2);
+  const tp = pts[n - 1], pv = pts[n - 2];
+  g.quadraticCurveTo(tp[0] + (tp[0] - pv[0]) * .9, tp[1] + (tp[1] - pv[1]) * .9, Rr[n - 1][0], Rr[n - 1][1]);
+  for (let i = n - 2; i >= 0; i--) g.quadraticCurveTo(Rr[i + 1][0], Rr[i + 1][1], (Rr[i + 1][0] + Rr[i][0]) / 2, (Rr[i + 1][1] + Rr[i][1]) / 2);
+  g.lineTo(Rr[0][0], Rr[0][1]); g.closePath(); g.fill();
+}
+function poly(g, pts, col) { g.fillStyle = col; g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); for (let i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]); g.closePath(); g.fill(); }
+function ell(g, x, y, rx, ry, col, rot = 0) { g.fillStyle = col; g.beginPath(); g.ellipse(x, y, Math.max(.01, rx), Math.max(.01, ry), rot, 0, TAU); g.fill(); }
+
+// ---------------------------------------------------------------- hair pieces
+function tailPts(ax, ay, len, dir, F, phase, n = 14) {
+  const t = F.t || 0, A = (F.hairAmp ?? 1) * len * .05, wind = (F.wind || 0) * len * .22, pts = [];
+  for (let i = 0; i < n; i++) {
+    const u = i / (n - 1);
+    const out = dir * len * (.1 * Math.sin(Math.min(u * 2.2, 1) * Math.PI / 2) + .05 * ss(.7, 1, u));
+    const sw = A * Math.sin(t * 1.7 + phase - u * 2.4) * Math.pow(u, 1.3) + wind * Math.pow(u, 1.6) + (F.tailPull || 0) * dir * Math.pow(u, 1.2) * len * .12;
+    pts.push([ax + out + sw, ay + u * len]);
+  }
+  return pts;
+}
+function tailW(R) { return u => R.tailW * (.5 + .85 * Math.sin(Math.min(u / .25, 1) * Math.PI / 2)) * (1 - .82 * Math.pow(u, 1.5)); }
+function bow(g, x, y, s, ang, col) {
+  g.save(); g.translate(x, y); g.rotate(ang); g.scale(s, s); g.fillStyle = col;
+  for (const sx of [-1, 1]) { g.beginPath(); g.moveTo(0, 0); g.bezierCurveTo(sx * 6, -13, sx * 21, -15, sx * 23, -4); g.bezierCurveTo(sx * 24, 5, sx * 10, 6, 0, 0); g.fill(); }
+  for (const sx of [-1, 1]) { g.beginPath(); g.moveTo(sx * 1, 2); g.lineTo(sx * 6, 20); g.lineTo(sx * 11, 17); g.closePath(); g.fill(); }
+  g.beginPath(); g.ellipse(0, 0, 5, 4.5, 0, 0, TAU); g.fill(); g.restore();
+}
+function headXf(hc, tilt, R) { const c = Math.cos(tilt), s = Math.sin(tilt); return (ux, uy) => [hc[0] + c * ux * R.hrx - s * uy * R.hry, hc[1] + s * ux * R.hrx + c * uy * R.hry]; }
+function headCenter(R, nx, ny, tilt) { const h = R.neckTop - R.headY; return [nx + h * Math.sin(tilt), ny - h * Math.cos(tilt)]; }
+
+// long hair (Mutsumi) hanging mass; side: -1 left edge… built in body space
+function longHair(g, F, R, P, hp, view, dy) {
+  const t = F.t || 0, amp = (F.hairAmp ?? 1), wind = (F.wind || 0);
+  const shY = R.shY + dy, bot = Math.min(shY + R.hairLen, (F.pose === 'sit' ? R.hipY + dy - 6 : 1e9));
+  const sw = (u, ph) => (amp * 6 * Math.sin(t * 1.5 + ph - u * 2) + wind * 30) * u;
+  g.fillStyle = P.hair; g.beginPath();
+  if (view === 'side') {
+    const A = hp(-.1, -1.02), B = hp(-1.06, -.2), C = hp(-.35, .8);
+    g.moveTo(A[0], A[1]); g.quadraticCurveTo(hp(-.95, -.95)[0], hp(-.95, -.95)[1], B[0], B[1]);
+    const o0 = B[0], oy = B[1];
+    g.bezierCurveTo(o0 - 6, oy + 60, o0 - 14 + sw(.6, 0), shY + 60, o0 - 16 + sw(1, 0), bot);
+    const tips = 4; for (let k = 1; k <= tips; k++) { const u = k / tips; const x = lerp(o0 - 16, C[0] - 8, u) + sw(1, u); g.lineTo(x + 3, bot - 14 * (k % 2) - 4 * u); }
+    g.bezierCurveTo(C[0] - 8 + sw(.5, 1), shY + 60, C[0] - 2, C[1] + 30, C[0], C[1]);
+    g.closePath(); g.fill();
+  } else {
+    const L = hp(-1.04, -.1), Rr = hp(1.04, -.1), T = hp(0, -1.05);
+    g.moveTo(T[0], T[1]); g.quadraticCurveTo(hp(-1.1, -1.05)[0], hp(-1.1, -1.05)[1], L[0], L[1]);
+    g.bezierCurveTo(L[0] - 10, L[1] + 70, -R.shW - 8 + sw(.5, 0), shY + 30, -R.shW - 2 + sw(1, 0), bot);
+    const tips = 7; for (let k = 1; k < tips; k++) { const u = k / tips; const x = lerp(-R.shW - 2, R.shW + 2, u) + sw(1, u * 2); g.lineTo(x, bot + (k % 2 ? 10 : -2) - Math.sin(u * Math.PI) * 6); }
+    g.lineTo(R.shW + 2 + sw(1, 2), bot);
+    g.bezierCurveTo(R.shW + 8 + sw(.5, 2), shY + 30, Rr[0] + 10, Rr[1] + 70, Rr[0], Rr[1]);
+    g.quadraticCurveTo(hp(1.1, -1.05)[0], hp(1.1, -1.05)[1], T[0], T[1]);
+    g.closePath(); g.fill();
+    if (view === 'back') { g.strokeStyle = shade(P.hair, .84); g.lineWidth = 2.2; g.lineCap = 'round'; g.beginPath();
+      for (let i = -2; i <= 2; i++) { const x0 = hp(i * .32, -.2), xb = i * R.shW * .36 + sw(1, i); g.moveTo(x0[0], x0[1] + 8); g.quadraticCurveTo(xb * .9 + sw(.5, i), (x0[1] + bot) / 2, xb, bot - 10 - (i & 1) * 6); }
+      g.stroke(); }
+  }
+}
+
+// ---------------------------------------------------------------- heads
+function eyesSide(g, F, P) {
+  if (F.eyes === 'none') return;
+  if (F.eyes === 'closed') { g.strokeStyle = PAL.lash; g.lineWidth = .07; g.lineCap = 'round'; g.beginPath(); g.moveTo(.56, .14); g.quadraticCurveTo(.69, .02, .82, .12); g.stroke(); }
+  else {
+    ell(g, .7, .14, .08, .15, P.eye); ell(g, .72, .2, .04, .06, shade(P.eye.length ? P.eye : '#cc9933', .6));
+    ell(g, .69, .0, .15, .05, PAL.lash, -.12); ell(g, .74, .08, .025, .03, '#ffffff');
+  }
+  ell(g, .6, .44, .14, .06, 'rgba(240,120,140,.35)');
+}
+function headSide(g, F, R, P, hc, tilt) {
+  const isS = F.who === 'saki';
+  g.save(); g.translate(hc[0], hc[1]); g.rotate(tilt); g.scale(R.hrx, R.hry);
+  ell(g, -.08, -.1, 1.06, 1.04, P.hair);
+  g.fillStyle = PAL.skin; g.beginPath();
+  g.moveTo(.15, -.5); g.quadraticCurveTo(.92, -.6, .97, -.08); g.lineTo(1.08, .16); g.lineTo(.96, .25);
+  g.quadraticCurveTo(.99, .31, .95, .36); g.lineTo(.93, .4); g.quadraticCurveTo(.97, .46, .9, .52);
+  g.quadraticCurveTo(.84, .82, .55, .95); g.quadraticCurveTo(.2, 1.02, -.05, .7); g.lineTo(-.1, .1); g.closePath(); g.fill();
+  eyesSide(g, F, P);
+  g.fillStyle = P.hair; g.beginPath();
+  if (isS) { g.moveTo(.1, -.95); g.quadraticCurveTo(.85, -.95, 1.02, -.35); g.lineTo(1., .02); g.lineTo(.86, -.2); g.lineTo(.8, .07); g.lineTo(.66, -.18); g.lineTo(.56, .02); g.lineTo(.45, -.3); g.lineTo(.2, -.2); }
+  else { g.moveTo(.05, -.98); g.quadraticCurveTo(.9, -.98, 1.03, -.3); g.lineTo(1.01, -.03); g.lineTo(.9, -.12); g.lineTo(.84, .01); g.lineTo(.72, -.1); g.lineTo(.62, .0); g.lineTo(.5, -.15); g.lineTo(.3, -.2); }
+  g.closePath(); g.fill();
+  g.fillStyle = P.hairSh; g.beginPath(); g.moveTo(.14, -.3); g.quadraticCurveTo(.3, .3, .2, 1.08); g.lineTo(.02, 1.0); g.quadraticCurveTo(.05, .3, -.1, -.25); g.closePath(); g.fill();
+  g.restore();
+}
+function eyesFront(g, F, P) {
+  if (F.eyes === 'none') return;
+  for (const sx of [-1, 1]) {
+    const x = sx * .42, y = .2;
+    if (F.eyes === 'closed') { g.strokeStyle = PAL.lash; g.lineWidth = .07; g.lineCap = 'round'; g.beginPath(); g.moveTo(x - .17, y + .04); g.quadraticCurveTo(x, y - .1, x + .17, y + .04); g.stroke(); continue; }
+    ell(g, x, y + .04, .16, .23, '#fbf6f3'); ell(g, x, y + .07, .13, .2, P.eye); ell(g, x, y + .13, .07, .1, shade(P.eye, .55));
+    ell(g, x, y - .14, .2, .06, PAL.lash, sx * .15); ell(g, x - sx * .04, y - .01, .04, .05, '#fff');
+  }
+  if (F.mouth !== 'none') { g.strokeStyle = '#b8636f'; g.lineWidth = .045; g.beginPath(); g.moveTo(-.07, .7); g.quadraticCurveTo(0, F.smile ? .76 : .72, .07, .7); g.stroke(); }
+  ell(g, -.55, .48, .15, .06, 'rgba(240,120,140,.32)'); ell(g, .55, .48, .15, .06, 'rgba(240,120,140,.32)');
+}
+function headFront(g, F, R, P, hc, tilt) {
+  const isS = F.who === 'saki';
+  g.save(); g.translate(hc[0], hc[1]); g.rotate(tilt); g.scale(R.hrx, R.hry);
+  g.fillStyle = PAL.skin; g.beginPath(); g.moveTo(-.92, -.2); g.quadraticCurveTo(-.95, .55, -.45, .88); g.quadraticCurveTo(0, 1.08, .45, .88); g.quadraticCurveTo(.95, .55, .92, -.2); g.quadraticCurveTo(.9, -1., 0, -1.); g.quadraticCurveTo(-.9, -1., -.92, -.2); g.fill();
+  eyesFront(g, F, P);
+  g.fillStyle = P.hair; g.beginPath(); g.moveTo(-1.08, .12); g.quadraticCurveTo(-1.16, -1.2, 0, -1.13); g.quadraticCurveTo(1.16, -1.2, 1.08, .12);
+  const edge = isS ? [[.95, -.3], [.82, -.02], [.66, -.34], [.47, -.05], [.3, -.38], [.1, -.07], [-.1, -.4], [-.3, -.05], [-.5, -.35], [-.68, -.02], [-.85, -.3], [-.96, -.04]]
+    : [[.96, -.16], [.85, -.08], [.72, -.15], [.58, -.06], [.42, -.14], [.26, -.05], [.1, -.13], [-.06, -.05], [-.22, -.14], [-.38, -.05], [-.54, -.14], [-.7, -.06], [-.85, -.15], [-.96, -.06]];
+  for (const [x, y] of edge) g.lineTo(x, y); g.closePath(); g.fill();
+  g.fillStyle = P.hairSh;
+  for (const sx of [-1, 1]) { g.beginPath(); g.moveTo(sx * 1.08, -.15); g.quadraticCurveTo(sx * 1.16, .6, sx * .92, 1.28); g.lineTo(sx * .74, 1.12); g.quadraticCurveTo(sx * .8, .4, sx * .82, -.12); g.closePath(); g.fill(); }
+  g.restore();
+}
+function headBack(g, F, R, P, hc, tilt) {
+  g.save(); g.translate(hc[0], hc[1]); g.rotate(tilt); g.scale(R.hrx, R.hry);
+  ell(g, 0, -.06, 1.09, 1.08, P.hair);
+  g.fillStyle = P.hair; g.beginPath(); g.moveTo(-.75, .45); g.quadraticCurveTo(-.45, 1.1, 0, 1.15); g.quadraticCurveTo(.45, 1.1, .75, .45); g.closePath(); g.fill();
+  g.restore();
+}
+
+// ---------------------------------------------------------------- items
+function cucumber(g, x, y, ang, s) {
+  g.save(); g.translate(x, y); g.rotate(ang); g.scale(s, s);
+  g.fillStyle = '#3c6a31'; g.beginPath(); g.moveTo(0, -4); g.quadraticCurveTo(26, -10, 50, -2); g.quadraticCurveTo(54, 2, 50, 5); g.quadraticCurveTo(26, 6, 0, 5); g.quadraticCurveTo(-4, 0, 0, -4); g.fill();
+  g.fillStyle = '#5b8c45'; g.beginPath(); g.moveTo(6, -2); g.quadraticCurveTo(26, -7, 46, -1); g.quadraticCurveTo(26, -3, 6, 0); g.fill();
+  ell(g, 53, 1, 4, 3.5, '#e9c63c'); seg(g, [-2, 0], [-9, -3], 2.5, 2, '#4a6a2a');
+  g.restore();
+}
+function umbrella(g, hx, hy, ang, s, e) {
+  g.save(); g.translate(hx, hy); g.rotate(ang);
+  const top = -232 * s, rx = 146 * s, ry = 70 * s;
+  g.strokeStyle = '#2b2b33'; g.lineWidth = 3.5 * s; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(0, 22 * s); g.quadraticCurveTo(0, 34 * s, -10 * s, 32 * s); g.stroke();
+  g.beginPath(); g.moveTo(0, 22 * s); g.lineTo(0, top - ry * .95); g.stroke();
+  g.fillStyle = 'rgba(214,226,238,0.26)'; g.beginPath(); g.moveTo(-rx, top);
+  g.bezierCurveTo(-rx, top - ry * 1.35, rx, top - ry * 1.35, rx, top);
+  const k = 8; for (let i = k; i > 0; i--) { const x0 = lerp(-rx, rx, i / k), x1 = lerp(-rx, rx, (i - 1) / k); g.quadraticCurveTo((x0 + x1) / 2, top - 12 * s, x1, top); }
+  g.closePath(); g.fill();
+  g.strokeStyle = 'rgba(235,240,248,0.5)'; g.lineWidth = 1.6 * s;
+  for (let i = 0; i <= k; i++) { const x = lerp(-rx, rx, i / k); g.beginPath(); g.moveTo(0, top - ry * 1.0); g.quadraticCurveTo(x * .7, top - ry * (1 - Math.pow(x / rx, 2)) * 1.05, x, top); g.stroke(); }
+  g.restore();
+  if (e) { e.save(); e.translate(hx, hy); e.rotate(ang); e.strokeStyle = 'rgba(255,226,180,.22)'; e.lineWidth = 2.2 * s; e.beginPath(); e.moveTo(-rx, top); e.bezierCurveTo(-rx, top - ry * 1.35, rx, top - ry * 1.35, rx, top); e.stroke();
+    e.fillStyle = 'rgba(200,215,235,.05)'; e.fill(); e.restore(); }
+}
+function guitarFront(g, cx, cy, ang, s) {
+  g.save(); g.translate(cx, cy); g.rotate(ang); g.scale(s, s);
+  seg(g, [8, -26], [178, -26], 13, 11, '#5b3b27');
+  poly(g, [[176, -36], [210, -38], [212, -16], [176, -16]], '#3a2a20');
+  g.fillStyle = '#ece5d4'; g.beginPath(); g.ellipse(-8, 10, 46, 38, 0, 0, TAU); g.fill(); g.beginPath(); g.ellipse(28, -10, 34, 28, 0, 0, TAU); g.fill();
+  g.beginPath(); g.ellipse(10, 0, 30, 28, 0, 0, TAU); g.fill();
+  ell(g, 6, 8, 18, 12, '#2a2626', .2); ell(g, 22, -6, 7, 7, '#17140f');
+  g.restore();
+  const c = Math.cos(ang), sn = Math.sin(ang), P = (x, y) => [cx + (c * x - sn * y) * s, cy + (sn * x + c * y) * s];
+  return { neck: P(96, -26), body: P(10, 0) };
+}
+function guitarCase(g, x, y, ang, s) { g.save(); g.translate(x, y); g.rotate(ang); g.scale(s, s); g.fillStyle = '#232229'; g.beginPath(); g.moveTo(-14, -120); g.quadraticCurveTo(0, -132, 14, -120); g.lineTo(18, 40); g.quadraticCurveTo(28, 60, 24, 92); g.quadraticCurveTo(0, 108, -24, 92); g.quadraticCurveTo(-28, 60, -18, 40); g.closePath(); g.fill(); g.restore(); }
+function keyboard(g, x, y, s) {
+  g.save(); g.translate(x, y); g.scale(s, s);
+  g.strokeStyle = '#151419'; g.lineWidth = 7; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(-90, 0); g.lineTo(80, -232); g.moveTo(90, 0); g.lineTo(-80, -232); g.stroke();
+  poly(g, [[-150, -258], [150, -258], [158, -232], [-158, -232]], '#1a1920');
+  poly(g, [[-144, -262], [144, -262], [150, -250], [-150, -250]], '#e8e6ef');
+  g.fillStyle = '#1a1920'; for (let i = 0; i < 28; i++) { if ([2, 6, 9, 13, 16, 20, 23, 27].includes(i)) continue; g.fillRect(-140 + i * 10.2, -262, 5.5, 6.5); }
+  g.restore();
+}
+function maskShape(g, x, y, s, ang, kind) {
+  g.save(); g.translate(x, y); g.rotate(ang); g.scale(s, s); g.beginPath();
+  if (kind === 'saki') { // winged half-mask
+    g.moveTo(0, -6); g.bezierCurveTo(14, -16, 30, -18, 44, -30); g.bezierCurveTo(42, -10, 40, 6, 30, 12); g.bezierCurveTo(18, 16, 8, 12, 0, 6);
+    g.bezierCurveTo(-8, 12, -18, 16, -30, 12); g.bezierCurveTo(-40, 6, -42, -10, -44, -30); g.bezierCurveTo(-30, -18, -14, -16, 0, -6); g.closePath();
+    g.moveTo(-8, -2); g.ellipse(-16, -2, 8, 5, 0, 0, TAU); g.moveTo(24, -2); g.ellipse(16, -2, 8, 5, 0, 0, TAU);
+  } else { // porcelain full mask
+    g.moveTo(0, -36); g.bezierCurveTo(26, -36, 32, -10, 30, 6); g.bezierCurveTo(28, 26, 12, 38, 0, 38); g.bezierCurveTo(-12, 38, -28, 26, -30, 6); g.bezierCurveTo(-32, -10, -26, -36, 0, -36); g.closePath();
+    g.moveTo(-6, -4); g.ellipse(-13, -4, 7, 4, 0, 0, TAU); g.moveTo(20, -4); g.ellipse(13, -4, 7, 4, 0, 0, TAU);
+  }
+  g.restore();
+}
+function drawMask(g, e, x, y, s, ang, kind, crack = 0, glow = 1) {
+  maskShape(g, x, y, s, ang, kind); g.fillStyle = '#f2ece6'; g.fill('evenodd');
+  if (e) {
+    maskShape(e, x, y, s, ang, kind); e.fillStyle = `rgba(255,236,226,${.32 * glow})`; e.fill('evenodd');
+    e.save(); e.translate(x, y); e.rotate(ang); e.scale(s, s); e.strokeStyle = `rgba(255,214,150,${.75 * glow})`; e.lineWidth = 1.4; maskShape(e, 0, 0, 1, 0, kind); e.stroke(); e.restore();
+    if (crack > 0) {
+      e.save(); e.translate(x, y); e.rotate(ang); e.scale(s, s); e.strokeStyle = `rgba(255,250,240,${clamp(crack * 1.5)})`; e.lineWidth = 1.8; e.beginPath();
+      const L = crack * 40; e.moveTo(0, -36); e.lineTo(-4, -36 + L * .5); e.lineTo(5, -36 + L); e.lineTo(-2, -36 + L * 1.5); e.moveTo(-4, -36 + L * .5); e.lineTo(-18, -30 + L * .6); e.moveTo(5, -36 + L); e.lineTo(22, -20 + L * .7);
+      e.stroke(); e.restore();
+    }
+  }
+}
+
+// ---------------------------------------------------------------- the puppet
+function standHands(R, view) {
+  if (view === 'side') return { hf: [-4, R.shY + 8 + (R.upper + R.fore) * .985], hn: [6, R.shY + 8 + (R.upper + R.fore) * .985] };
+  return { hl: [-R.shW - 9, R.shY + R.upper + R.fore - 4], hr: [R.shW + 9, R.shY + R.upper + R.fore - 4] };
+}
+function gait(R, ph, amt) {
+  const st = R.thigh * .24 * amt, lift = R.thigh * .17 * amt, sw = .36 * amt, L = (R.upper + R.fore) * .985;
+  const foot = p => [st * Math.cos(p), -lift * Math.max(0, -Math.sin(p))];
+  return {
+    fn: foot(ph), ff: foot(ph + Math.PI), bob: R.thigh * .035 * amt * (Math.abs(Math.cos(ph)) - .5),
+    hn: [4 + L * Math.sin(-sw * Math.cos(ph)), R.shY + 8 + L * Math.cos(sw * Math.cos(ph))],
+    hf: [-2 + L * Math.sin(sw * Math.cos(ph)), R.shY + 8 + L * Math.cos(sw * Math.cos(ph))],
+  };
+}
+function arm(g, R, sh, tgt, col, skinCol, bend, O, held) {
+  const [e, h] = ik(sh, tgt, R.upper, R.fore, bend);
+  seg(g, sh, e, R.armW, R.armW * .9, col);
+  seg(g, e, h, O.longSleeve ? R.foreW * 1.05 : R.foreW, R.foreW * .85, O.longSleeve ? col : skinCol);
+  if (O.longSleeve) { const k = .82; seg(g, [lerp(e[0], h[0], k), lerp(e[1], h[1], k)], h, R.foreW * 1.15, R.foreW * 1.1, O.gown ? O.collar : col); }
+  ell(g, h[0], h[1], R.handR, R.handR * .95, skinCol);
+  if (held) held(h, e);
+  return h;
+}
+function leg(g, R, hip, foot, O, bend, side, skin) {
+  const [k, a] = ik(hip, foot, R.thigh, R.shin, bend);
+  seg(g, hip, k, R.legW, R.legW * .82, skin);
+  seg(g, k, a, R.calfW * 1.1, R.calfW * .8, skin);
+  const kk = [lerp(k[0], a[0], .36), lerp(k[1], a[1], .36)];
+  seg(g, kk, a, R.calfW * 1.02, R.calfW * .82, O.sock);
+  if (side) { g.fillStyle = O.shoe; g.beginPath(); g.ellipse(a[0] + R.footL * .32, a[1] + 2, R.footL * .6, R.footL * .26, 0, 0, TAU); g.fill(); }
+  else ell(g, a[0], a[1] + 1, R.footL * .34, R.footL * .25, O.shoe);
+}
+
+function drawSide(g, F, R, P, O) {
+  const isS = F.who === 'saki', t = F.t || 0;
+  const W = F.walk ? gait(R, F.ph || 0, F.walk) : null;
+  const dy = (W ? W.bob : 0) + (F.bob || 0);
+  const hipY = R.hipY + dy, shY = R.shY + dy, wY = R.waistY + dy, nb = R.neckBot + dy, hemY = R.hemY + dy, D = R.depth;
+  const sh = [-2, shY + 8];
+  const SH = standHands(R, 'side');
+  const hf = F.hf || (W ? [W.hf[0], W.hf[1] + dy] : [SH.hf[0], SH.hf[1] + dy]);
+  const hn = F.hn || (W ? [W.hn[0], W.hn[1] + dy] : [SH.hn[0], SH.hn[1] + dy]);
+  const ff = F.ff || (W ? W.ff : [-6, 0]), fn = F.fn || (W ? W.fn : [8, 0]);
+  const tilt = F.tilt || 0;
+  const nx = (F.headDX || 0), ny = R.neckTop + dy + (F.headDY || 0);
+  const hc = headCenter(R, nx, ny, tilt), hp = headXf(hc, tilt, R);
+  const dk = .8;
+  if (F.case) guitarCase(g, -D - 10, shY + 112, .12, R === RIG.teen ? 1 : .6);
+  // far arm
+  arm(g, R, [sh[0] + 3, sh[1] - 1], hf, shade(O.top, dk), PAL.skinSh, 1, { ...O, collar: shade(O.collar || '#ffffff', dk) }, F.heldF);
+  // hair behind
+  if (isS) {
+    const a = hp(-.3, -.78); strand(g, tailPts(a[0] + 8, a[1] - 2, R.tailL, -1, F, 1.3), tailW(R), P.hairSh);
+  } else longHair(g, F, R, P, hp, 'side', dy);
+  // far leg
+  leg(g, R, [-3, hipY], ff, { ...O, sock: shade(O.sock, dk), shoe: shade(O.shoe, dk) }, -1, true, PAL.skinSh);
+  // torso
+  g.fillStyle = O.top; g.beginPath();
+  g.moveTo(-6, nb); g.quadraticCurveTo(-D - 1, shY + 2, -D, shY + 30); g.quadraticCurveTo(-D + 2, wY - 10, -D + 3, wY); g.lineTo(-D - 3, hipY);
+  g.lineTo(D + 1, hipY); g.lineTo(D * .6, wY); g.quadraticCurveTo(D * 1.25, shY + 48, D, shY + 28); g.quadraticCurveTo(D * .8, shY + 6, 6, nb); g.closePath(); g.fill();
+  const swing = W ? Math.sin(F.ph) * 4 * F.walk : 0;
+  g.fillStyle = O.skirt; g.beginPath(); g.moveTo(-D - 3, hipY - 8);
+  g.lineTo(-R.hemW * .78 + swing, hemY); g.quadraticCurveTo(0, hemY + 7, R.hemW * .6 + swing, hemY - 2); g.lineTo(D + 1, hipY - 8); g.closePath(); g.fill();
+  if (O === OUT.uniform) {
+    poly(g, [[-6, nb], [-D - 2, shY + 4], [-D - 1, shY + 46], [-D * .3, shY + 44], [-2, nb + 6]], O.collar);
+    poly(g, [[4, nb + 2], [D * .9, shY + 22], [D * .5, shY + 40], [2, shY + 16]], O.collar);
+    ell(g, D * .7, shY + 38, 6, 5, O.scarf); poly(g, [[D * .7, shY + 38], [D * .9, shY + 70], [D * .3, shY + 64]], O.scarf);
+  } else if (O.collar) { poly(g, [[-6, nb], [-D, shY + 8], [-D * .2, shY + 22], [D * .9, shY + 12], [6, nb]], O.collar); }
+  // near leg
+  leg(g, R, [3, hipY], fn, O, -1, true, PAL.skin);
+  // neck + head
+  seg(g, [0, nb + 6], [nx * .5, ny + 4], R.neckW, R.neckW, PAL.skinSh);
+  headSide(g, F, R, P, hc, tilt);
+  if (isS) {
+    const a = hp(-.36, -.72);
+    strand(g, tailPts(a[0], a[1], R.tailL, -1, F, 0), tailW(R), P.hair);
+    bow(g, a[0] + 2, a[1] - 2, R.bow * .9, -.3 + tilt, PAL.ribbon);
+  }
+  // near arm
+  arm(g, R, sh, hn, O.top, PAL.skin, 1, O, F.heldN);
+}
+
+function drawFront(g, F, R, P, O) {
+  const isS = F.who === 'saki', t = F.t || 0, dy = F.bob || 0;
+  const hipY = R.hipY + dy, shY = R.shY + dy, wY = R.waistY + dy, nb = R.neckBot + dy, hemY = R.hemY + dy;
+  const tilt = F.tilt || 0, nx = F.headDX || 0, ny = R.neckTop + dy + (F.headDY || 0);
+  const hc = headCenter(R, nx, ny, tilt), hp = headXf(hc, tilt, R);
+  const SH = standHands(R, 'front');
+  let hl = F.hl || [SH.hl[0], SH.hl[1] + dy], hr = F.hr || [SH.hr[0], SH.hr[1] + dy];
+  // hair behind
+  if (isS) {
+    for (const sx of [-1, 1]) { const a = hp(sx * .78, -.62); strand(g, tailPts(a[0] + sx * 6, a[1], R.tailL, sx, F, sx * .8), tailW(R), P.hairSh); }
+  } else longHair(g, F, R, { hair: P.hairSh }, hp, 'front', dy);
+  // legs
+  if (!O.gown) for (const sx of [-1, 1]) leg(g, R, [sx * R.hipW * .42, hipY], F[sx < 0 ? 'fl' : 'fr'] || [sx * R.hipW * .5, 0], O, sx < 0 ? 1 : -1, false, PAL.skin);
+  // torso
+  g.fillStyle = O.top; g.beginPath(); g.moveTo(-R.neckW * .7, nb);
+  g.quadraticCurveTo(-R.shW * .7, shY - 2, -R.shW, shY + 9); g.quadraticCurveTo(-R.chestW - 3, shY + 30, -R.chestW, shY + 46);
+  g.quadraticCurveTo(-R.waistW - 1, wY - 20, -R.waistW, wY); g.lineTo(-R.hipW, hipY + 4); g.lineTo(R.hipW, hipY + 4); g.lineTo(R.waistW, wY);
+  g.quadraticCurveTo(R.waistW + 1, wY - 20, R.chestW, shY + 46); g.quadraticCurveTo(R.chestW + 3, shY + 30, R.shW, shY + 9); g.quadraticCurveTo(R.shW * .7, shY - 2, R.neckW * .7, nb); g.closePath(); g.fill();
+  if (O.gown) {
+    const hw = R.hemW * 2.25, sway = Math.sin(t * .8) * 6;
+    g.fillStyle = O.skirt; g.beginPath(); g.moveTo(-R.waistW, wY);
+    g.bezierCurveTo(-R.hemW * .9, wY + 70, -hw - 10 + sway, -80, -hw + sway, -2);
+    const k = 9; for (let i = 1; i <= k; i++) { const x0 = lerp(-hw, hw, (i - 1) / k) + sway, x1 = lerp(-hw, hw, i / k) + sway; g.quadraticCurveTo((x0 + x1) / 2, 14, x1, -2); }
+    g.bezierCurveTo(hw + 10 + sway, -80, R.hemW * .9, wY + 70, R.waistW, wY); g.closePath(); g.fill();
+    g.strokeStyle = O.accent; g.lineWidth = 3; g.beginPath();
+    for (let i = 0; i <= 9; i++) { const x = lerp(-hw * .92, hw * .92, i / 9) + sway; g.moveTo(x * .3, wY + 30); g.quadraticCurveTo(x * .7, wY + 120, x, -12); } g.stroke();
+    g.fillStyle = O.collar; g.beginPath(); for (let i = 0; i <= 12; i++) { const a = Math.PI * (i / 12); const x = -Math.cos(a) * R.shW * .62, y = nb + 2 + Math.sin(a) * 10; i ? g.lineTo(x, y) : g.moveTo(x, y); } for (let i = 12; i >= 0; i--) { const a = Math.PI * (i / 12); g.lineTo(-Math.cos(a) * R.shW * .5, nb - 2 + Math.sin(a) * 18 + (i % 2) * 6); } g.closePath(); g.fill();
+    ell(g, -R.shW + 2, shY + 12, 15, 13, O.top); ell(g, R.shW - 2, shY + 12, 15, 13, O.top);
+  } else {
+    g.fillStyle = O.skirt; g.beginPath(); g.moveTo(-R.hipW + 2, hipY - 8); g.lineTo(-R.hemW, hemY); g.quadraticCurveTo(0, hemY + 9, R.hemW, hemY); g.lineTo(R.hipW - 2, hipY - 8); g.closePath(); g.fill();
+    g.strokeStyle = shade(O.skirt.startsWith('#') ? O.skirt : '#333333', .78); g.lineWidth = 1.6; g.beginPath();
+    for (let i = -3; i <= 3; i++) { g.moveTo(i * R.hipW * .28, hipY - 4); g.lineTo(i * R.hemW * .3, hemY + 3); } g.stroke();
+    if (O === OUT.uniform) {
+      poly(g, [[-R.shW * .86, shY + 6], [0, shY + 50], [R.shW * .86, shY + 6], [R.shW * .55, shY + 1], [0, shY + 34], [-R.shW * .55, shY + 1]], O.collar);
+      poly(g, [[-7, shY + 44], [7, shY + 44], [0, shY + 74]], O.scarf); ell(g, 0, shY + 46, 7, 6, O.scarf);
+    } else if (O.collar) { ell(g, -9, nb + 6, 12, 8, O.collar, .3); ell(g, 9, nb + 6, 12, 8, O.collar, -.3); }
+    if (!O.longSleeve) { ell(g, -R.shW + 3, shY + 12, 11, 10, O.top); ell(g, R.shW - 3, shY + 12, 11, 10, O.top); }
+  }
+  if (F.guitar) { const gi = guitarFront(g, -10, hipY + 6, -.36, R === RIG.teen ? 1 : .7); hl = [gi.body[0] - 2, gi.body[1] - 4 + (F.strum || 0)]; hr = [gi.neck[0], gi.neck[1] + 3]; }
+  if (F.preArms) F.preArms(g);
+  // arms
+  arm(g, R, [-R.shW + 4, shY + 9], hl, O.top, PAL.skin, 1, O, F.heldL);
+  arm(g, R, [R.shW - 4, shY + 9], hr, O.top, PAL.skin, -1, O, F.heldR);
+  // neck + head
+  seg(g, [0, nb + 6], [nx * .5, ny + 4], R.neckW, R.neckW, PAL.skinSh);
+  headFront(g, F, R, P, hc, tilt);
+  if (isS) for (const sx of [-1, 1]) { const a = hp(sx * .8, -.7); bow(g, a[0], a[1], R.bow * .85, sx * .5 + tilt, PAL.ribbon); }
+  if (F.mask > 0) { const m = hp(0, .12); drawMask(g, F.e, m[0], m[1], R.hrx / 34 * 1.02, tilt, F.who, F.crack || 0, F.maskGlow ?? 1); }
+}
+
+function drawBack(g, F, R, P, O) {
+  const isS = F.who === 'saki', sit = F.pose === 'sit';
+  const baseHip = sit ? -R.sitH : R.hipY;
+  const dy = baseHip - R.hipY + (F.bob || 0);
+  const hipY = R.hipY + dy, shY = R.shY + dy, wY = R.waistY + dy, nb = R.neckBot + dy, hemY = R.hemY + dy;
+  const SH = standHands(R, 'back');
+  if (sit) {
+    ell(g, 0, -10, R.hemW * 1.12, 19, O.skirt);
+    g.fillStyle = O.skirt; g.beginPath(); g.moveTo(-R.hipW - 4, hipY - 10); g.quadraticCurveTo(-R.hemW * 1.1, -14, -R.hemW * 1.08, -8); g.lineTo(R.hemW * 1.08, -8); g.quadraticCurveTo(R.hemW * 1.1, -14, R.hipW + 4, hipY - 10); g.closePath(); g.fill();
+  } else {
+    for (const sx of [-1, 1]) leg(g, R, [sx * R.hipW * .42, hipY], [sx * R.hipW * .48, 0], O, sx < 0 ? 1 : -1, false, PAL.skin);
+    g.fillStyle = O.skirt; g.beginPath(); g.moveTo(-R.hipW + 2, hipY - 8); g.lineTo(-R.hemW, hemY); g.quadraticCurveTo(0, hemY + 9, R.hemW, hemY); g.lineTo(R.hipW - 2, hipY - 8); g.closePath(); g.fill();
+  }
+  g.save();
+  if (F.lean) { g.translate(0, hipY); g.rotate(F.lean); g.translate(0, -hipY); }
+  g.fillStyle = O.top; g.beginPath(); g.moveTo(-R.neckW * .7, nb);
+  g.quadraticCurveTo(-R.shW * .7, shY - 2, -R.shW, shY + 9); g.quadraticCurveTo(-R.chestW - 3, shY + 30, -R.chestW, shY + 46);
+  g.quadraticCurveTo(-R.waistW - 1, wY - 20, -R.waistW, wY); g.lineTo(-R.hipW, hipY + 4); g.lineTo(R.hipW, hipY + 4); g.lineTo(R.waistW, wY);
+  g.quadraticCurveTo(R.waistW + 1, wY - 20, R.chestW, shY + 46); g.quadraticCurveTo(R.chestW + 3, shY + 30, R.shW, shY + 9); g.quadraticCurveTo(R.shW * .7, shY - 2, R.neckW * .7, nb); g.closePath(); g.fill();
+  if (O === OUT.uniform) {
+    poly(g, [[-R.shW * .78, shY + 4], [R.shW * .78, shY + 4], [R.shW * .7, shY + 52], [-R.shW * .7, shY + 52]], '#b9bfd0');
+    g.strokeStyle = O.top; g.lineWidth = 2.6; g.strokeRect(-R.shW * .6, shY + 9, R.shW * 1.2, 36);
+  }
+  const hl = F.hl || [SH.hl[0], SH.hl[1] + dy], hr = F.hr || [SH.hr[0], SH.hr[1] + dy];
+  arm(g, R, [-R.shW + 4, shY + 9], hl, O.top, PAL.skin, 1, O, F.heldL);
+  arm(g, R, [R.shW - 4, shY + 9], hr, O.top, PAL.skin, -1, O, F.heldR);
+  const tilt = F.tilt || 0, nx = F.headDX || 0, ny = R.neckTop + dy + (F.headDY || 0);
+  const hc = headCenter(R, nx, ny, tilt), hp = headXf(hc, tilt, R);
+  seg(g, [0, nb + 6], [nx * .6, ny + 6], R.neckW, R.neckW, PAL.skinSh);
+  headBack(g, F, R, P, hc, tilt);
+  if (isS) {
+    for (const sx of [-1, 1]) { const a = hp(sx * .9, -.5); strand(g, tailPts(a[0] + sx * 3, a[1], R.tailL * (sit ? .8 : 1), sx, F, sx * 1.1), tailW(R), P.hair); const b = hp(sx * 1.0, -.66); bow(g, b[0] + sx * 6, b[1] - 4, R.bow * 1.0, sx * .55 + tilt, PAL.ribbon); }
+  } else longHair(g, F, R, P, hp, 'back', dy);
+  g.restore();
+}
+
+function fig(g, F) {
+  const R = RIG[F.rig || 'teen'], P = PAL[F.who], O = OUT[F.outfit || 'uniform'];
+  g.save(); g.translate(F.x, F.y);
+  const s = F.s || 1; g.scale(s * (F.view === 'side' ? (F.f || 1) : 1), s);
+  if (F.e) { F.e.save(); F.e.setTransform(g.getTransform()); }
+  if (F.view === 'side') drawSide(g, F, R, P, O); else if (F.view === 'back') drawBack(g, F, R, P, O); else drawFront(g, F, R, P, O);
+  if (F.e) F.e.restore();
+  g.restore();
+}
+// world ↔ figure-local helpers
+function toLocal(F, wx, wy) { const s = F.s || 1, f = F.view === 'side' ? (F.f || 1) : 1; return [(wx - F.x) / (s * f), (wy - F.y) / s]; }
+
+// ---------------------------------------------------------------- hands close-up (back of hand, fingers pointing up-screen)
+function hand(g, x, y, ang, s, mirror, spread, col, cuff, sleeve) {
+  g.save(); g.translate(x, y); g.rotate(ang); g.scale(s * (mirror ? -1 : 1), s);
+  poly(g, [[-40, 84], [40, 84], [60, 900], [-60, 900]], sleeve); poly(g, [[-38, 70], [38, 70], [41, 96], [-41, 96]], cuff);
+  g.fillStyle = col; g.beginPath(); g.moveTo(-34, 70); g.quadraticCurveTo(-42, 10, -38, -40); g.quadraticCurveTo(0, -56, 40, -44); g.quadraticCurveTo(44, 10, 34, 70); g.closePath(); g.fill();
+  const fing = [[-27, 66, 15.5], [-9, 78, 16.5], [9, 74, 16], [25, 56, 14]];
+  fing.forEach(([fx, len, w], i) => { const a = (i - 1.5) * .07 * spread; seg(g, [fx, -40], [fx + Math.sin(a) * len, -40 - Math.cos(a) * len], w, w * .82, col); });
+  seg(g, [-36, 20], [-66, -24], 19, 15, col);
+  g.restore();
+}
+
+// ---------------------------------------------------------------- scenery
+function makeTree(seed, w = 1500, h = 1150) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); const r = mulberry32(seed);
+  const ends = [];
+  const branch = (x, y, ang, len, wd, depth) => {
+    const x2 = x + Math.cos(ang) * len, y2 = y + Math.sin(ang) * len;
+    g.strokeStyle = '#4b3436'; g.lineCap = 'round'; g.lineWidth = wd; g.beginPath(); g.moveTo(x, y);
+    g.quadraticCurveTo((x + x2) / 2 + (r() - .5) * len * .3, (y + y2) / 2, x2, y2); g.stroke();
+    if (depth <= 0 || len < 16) { ends.push([x2, y2]); return; }
+    const n = depth > 4 ? 2 : (r() < .5 ? 2 : 3);
+    for (let i = 0; i < n; i++) branch(x2, y2, ang + (r() - .5) * .9 + (i - (n - 1) / 2) * .62, len * (.66 + r() * .16), wd * .66, depth - 1);
+    if (depth < 3) ends.push([x2, y2]);
+  };
+  branch(w * .5, h + 4, -Math.PI / 2 + (r() - .5) * .12, 300, 36, 6);
+  const cols = ['#f6c4d2', '#f3b3c6', '#fbd9e3', '#eea9bf', '#fff0f4'];
+  for (const [x, y] of ends) for (let k = 0; k < 12; k++) {
+    const a = r() * TAU, d = r() * 44; g.globalAlpha = .5 + r() * .3; g.fillStyle = cols[(r() * cols.length) | 0];
+    g.beginPath(); g.arc(x + Math.cos(a) * d, y + Math.sin(a) * d * .8, 9 + r() * 19, 0, TAU); g.fill();
+  }
+  g.globalAlpha = 1; return c;
+}
+function makeTrellis() {
+  const r = mulberry32(5), T = { poles: [1300, 1455, 1610, 1765, 1920], leaves: [], cukes: [], flowers: [], vines: [] };
+  for (const x of T.poles) {
+    const pts = []; for (let i = 0; i <= 24; i++) { const u = i / 24; pts.push([x + Math.sin(u * 9 + x) * 26, 882 - u * 330]); } T.vines.push(pts);
+    for (let i = 0; i < 16; i++) { const p = pts[2 + ((r() * 21) | 0)]; T.leaves.push({ x: p[0] + (r() - .5) * 70, y: p[1] + (r() - .5) * 30, s: 14 + r() * 16, a: (r() - .5) * 1.6, ph: r() * 6 }); }
+    for (let i = 0; i < 4; i++) { const p = pts[6 + ((r() * 16) | 0)]; T.flowers.push({ x: p[0] + (r() - .5) * 60, y: p[1] + (r() - .5) * 24 }); }
+    for (let i = 0; i < 2; i++) { const p = pts[7 + ((r() * 12) | 0)]; T.cukes.push({ x: p[0] + (r() - .5) * 50, y: p[1], a: 1.45 + (r() - .5) * .3, s: .9 + r() * .3 }); }
+  }
+  T.cukes.unshift({ x: 1288, y: 676, a: 1.5, s: 1, pick: true });
+  return T;
+}
+function leaf(g, x, y, s, a, col) { g.save(); g.translate(x, y); g.rotate(a); g.scale(s / 20, s / 20); g.fillStyle = col; g.beginPath(); g.moveTo(0, 0); g.bezierCurveTo(-18, -6, -22, -26, -6, -30); g.quadraticCurveTo(0, -24, 6, -30); g.bezierCurveTo(22, -26, 18, -6, 0, 0); g.fill(); g.restore(); }
+function drawTrellis(g, T, t, picked) {
+  g.strokeStyle = '#7d6a4c'; g.lineCap = 'round'; g.lineWidth = 6;
+  for (const x of T.poles) { g.beginPath(); g.moveTo(x, 890); g.lineTo(x + 4, 548); g.stroke(); }
+  g.lineWidth = 4; g.beginPath(); for (let i = 0; i < T.poles.length - 1; i++) { const a = T.poles[i], b = T.poles[i + 1]; g.moveTo(a, 600); g.lineTo(b, 600); g.moveTo(a, 720); g.lineTo(b, 720); g.moveTo(a, 840); g.lineTo(b, 600); g.moveTo(a, 600); g.lineTo(b, 840); } g.stroke();
+  g.strokeStyle = '#4a7135'; g.lineWidth = 3;
+  for (const v of T.vines) { g.beginPath(); g.moveTo(v[0][0], v[0][1]); for (let i = 1; i < v.length; i++) g.lineTo(v[i][0] + Math.sin(t + i) * 1.5, v[i][1]); g.stroke(); }
+  for (const c of T.cukes) { if (c.pick && picked) continue; const sw = Math.sin(t * 1.2 + c.x) * .04; seg(g, [c.x, c.y - 12], [c.x, c.y + 2], 2.5, 2, '#4a6a2a'); cucumber(g, c.x, c.y, c.a + sw, c.s); }
+  for (const l of T.leaves) leaf(g, l.x, l.y, l.s, l.a + Math.sin(t * 1.3 + l.ph) * .08, l.ph > 3 ? '#4b7a37' : '#5a8a41');
+  for (const f of T.flowers) { for (let k = 0; k < 5; k++) ell(g, f.x + Math.cos(k * 1.256) * 4, f.y + Math.sin(k * 1.256) * 4, 3.6, 3.6, '#f1d24a'); }
+}
+function grass(g, x0, x1, yfn, step, hmin, hmax, t, col, seed, wind = 1) {
+  const r = mulberry32(seed); g.strokeStyle = col; g.lineCap = 'round';
+  for (let x = x0; x < x1; x += step * (.6 + r() * .8)) {
+    const h = hmin + r() * (hmax - hmin), y = yfn(x), b = Math.sin(t * 1.3 + x * .013) * h * .25 * wind + (r() - .5) * h * .35;
+    g.lineWidth = 1.6 + r() * 2; g.beginPath(); g.moveTo(x, y + 3); g.quadraticCurveTo(x + b * .3, y - h * .5, x + b, y - h); g.stroke();
+  }
+}
+function curtain(g, x0, x1, t, left) {
+  const n = 9, w = (x1 - x0) / n;
+  for (let i = 0; i < n; i++) {
+    const x = x0 + i * w, sw = Math.sin(t * .5 + i) * 6;
+    const grd = g.createLinearGradient(x, 0, x + w, 0); grd.addColorStop(0, '#4a0914'); grd.addColorStop(.5, '#a01b30'); grd.addColorStop(1, '#3a050e');
+    g.fillStyle = grd; g.beginPath(); g.moveTo(x - 2, 60); g.lineTo(x + w + 2, 60); g.quadraticCurveTo(x + w + sw, 600, x + w + sw * 1.5 + (left ? -i * 3 : i * 3), 1000); g.lineTo(x + sw * 1.5 + (left ? -i * 3 : i * 3), 1000); g.quadraticCurveTo(x + sw, 600, x - 2, 60); g.fill();
+  }
+  g.fillStyle = '#4a0913'; g.beginPath(); g.moveTo(x0, 40); g.lineTo(x1, 40); g.lineTo(x1, 120);
+  for (let i = 4; i >= 0; i--) { const xa = lerp(x0, x1, (i + 1) / 5), xb = lerp(x0, x1, i / 5); g.quadraticCurveTo((xa + xb) / 2, 190, xb, 120); }
+  g.closePath(); g.fill();
+}
+
+// =====================================================================
+//  SCENES — choreography for each chapter (local time tl, seconds)
+// =====================================================================
+const G0 = { expo: 1, sat: 1, gamma: 1, lift: [0, 0, 0], gain: [1, 1, 1], vig: .5, bloom: .6, th: .6, grain: .04, leak: 0, ca: .0015, box: 1 };
+function baseState() {
+  return { cam: { x: 960, y: 540, z: 1 }, light: [960, 300], amb: [.5, .5, .5], rim: [1, 1, 1], rimW: 3, omni: .4, P0: [0, 0, 0, 0], P1: [0, 0, 0, 0], P2: [0, 0, 0, 0], met: null, refl: null, parts: [], flares: [], emis: false, grade: Object.assign({}, G0), fadeB: 0, fadeW: 0, lens: 0 };
+}
+const W2S = (st, x, y, d = 1) => { const z = 1 + (st.cam.z - 1) * d; return [(x - 960 - (st.cam.x - 960) * d) * z + 960, (y - 540 - (st.cam.y - 540) * d) * z + 540]; };
+const mix3 = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
+const mul3 = (a, k) => [a[0] * k, a[1] * k, a[2] * k];
+function grade(o) { return Object.assign({}, G0, o); }
+function lensFlare(st, L, k, col) {
+  st.flares.push([L[0], L[1], 150, .32 * k, col[0], col[1], col[2], 2]);
+  const C = [960, 540];
+  [[.45, 26, .07], [1.25, 54, .045], [1.65, 18, .09], [2.05, 88, .03]].forEach(([f, r, a]) => st.flares.push([lerp(L[0], C[0], f), lerp(L[1], C[1], f), r, a * k, col[0] * .8, col[1], col[2] * 1.1, 0]));
+}
+function twinLights(st, c, t, amp, rad, wobble = 0) {
+  if (amp <= 0) return;
+  const pos = (tt, ph) => { const a = tt * 1.15 + ph; return [c[0] + Math.cos(a) * rad * (1 + .25 * Math.sin(tt * .7 + ph)) , c[1] + Math.sin(a) * rad * .55 + Math.sin(tt * .9 + ph) * wobble]; };
+  [[0, [.55, .72, 1]], [Math.PI, [.55, 1, .74]]].forEach(([ph, col]) => {
+    for (let i = 26; i >= 1; i--) { const p = W2S(st, ...pos(t - i * .05, ph)); const k = Math.pow(1 - i / 27, 1.6); st.flares.push([p[0], p[1], 22 * k + 6, .32 * k * amp, col[0], col[1], col[2], 0]); }
+    const p = W2S(st, ...pos(t, ph));
+    st.flares.push([p[0], p[1], 70, .95 * amp, col[0], col[1], col[2], 1]);
+    st.flares.push([p[0], p[1], 190, .22 * amp, col[0], col[1], col[2], 0]);
+    st.flares.push([p[0], p[1], 46, .28 * amp, col[0], col[1], col[2], 2]);
+  });
+}
+const blink = (t, seed) => { const p = (t * .37 + seed) % 1; return p > .965 ? 'closed' : 'open'; };
+function walkInfo(posFn, t, R, amtDiv) {
+  const x = posFn(t), v = (posFn(t + .05) - posFn(t - .05)) / .1;
+  return { x, amt: clamp(Math.abs(v) / amtDiv), ph: (x / (4 * R.thigh * .24)) * TAU };
+}
+
+// ───────────────────────────────────────────────────────── 0 · Prologue
+function stPrologue(tl) {
+  const st = baseState();
+  st.P0 = [ss(0, 5, tl), 0, 0, 0];
+  st.cam = { x: 960, y: 540 - 30 * ss(0, 20, tl), z: 1 + .05 * ss(0, 20, tl) };
+  const c = [lerp(700, 960, ss(0, 15, tl)), lerp(420, 300, ss(0, 13, tl)) + 520 * ss(15, 20.5, tl)];
+  twinLights(st, c, tl, ss(1.2, 4.5, tl), 74 * (1 - .45 * ss(14, 19, tl)), 10);
+  st.grade = grade({ expo: 1.05, sat: 1.12, vig: .65, bloom: .95, th: .42, grain: .05, ca: .002, lift: [0, .005, .02] });
+  return st;
+}
+
+// ───────────────────────────────────────────────────────── 1 · Dusk / cucumbers
+let TRELLIS = null;
+function stDusk(tl) {
+  const st = baseState();
+  st.cam = { x: kf(tl, [[-2, 1040], [30, 960], [40, 950]]), y: kf(tl, [[-2, 540], [31, 540], [40, 508]]), z: kf(tl, [[-2, 1.08], [28, 1.0], [40, 1.03]]) };
+  const sun = W2S(st, 935, 612, .1);
+  st.P0 = [sun[0], sun[1], 0, 0];
+  st.light = sun; st.amb = [.3, .22, .26]; st.rim = [.9, .62, .4]; st.omni = .25; st.rimW = 2.6;
+  st.parts = [{ type: 0, n: 150, p: [.95, 0, 0, 1] }, { type: 1, n: 40, p: [ss(24, 31, tl) * .95, 0], p2: [480, 640, 1900, 880] }];
+  lensFlare(st, sun, 1, [1, .78, .52]);
+  st.grade = grade({ expo: 1.02, sat: 1.1, lift: [.015, 0, .03], gamma: 1.0, gain: [1.05, .99, .92], vig: .5, bloom: .48, th: .7, grain: .045, leak: .45, ca: .0015 });
+  const D = duskPose(tl);
+  if (D.promise > 0) { const p = W2S(st, D.meet[0], D.meet[1]); st.flares.push([p[0], p[1], 46, .6 * D.promise * (.75 + .25 * Math.sin(tl * 3)), 1, .85, .6, 1]); }
+  st.D = D;
+  return st;
+}
+function duskPose(tl) {
+  const R = RIG.child, s = 1, Y = 880;
+  const sPos = t => 360 + (820 - 360) * easeIO(clamp((t - 3) / 9)) + 35 * ss(28, 30.5, t);
+  const mPos = t => 1200 - 170 * easeIO(clamp((t - 12.8) / 3)) - 30 * ss(28, 30.5, t);
+  const sw = walkInfo(sPos, tl, R, 55), mw = walkInfo(mPos, tl, R, 55);
+  const S = { who: 'saki', rig: 'child', outfit: 'childS', view: 'side', f: 1, x: sw.x, y: Y, s, t: tl, walk: sw.amt, ph: sw.ph, hairAmp: 1 + sw.amt, eyes: blink(tl, .1) };
+  const M = { who: 'mutsu', rig: 'child', outfit: 'childM', view: 'side', f: tl < 12.6 ? 1 : -1, x: mw.x, y: Y, s, t: tl + 3, walk: mw.amt, ph: mw.ph + 1, hairAmp: .8 + mw.amt, eyes: blink(tl, .55) };
+  const SH = standHands(R, 'side');
+  const meet = [(sw.x + mw.x) / 2, Y + (R.shY + 66) * s];
+  const promise = ss(29.5, 31.5, tl);
+  // Mutsumi: reach, pick, hold, offer, promise
+  const cuke = TRELLIS ? TRELLIS.cukes[0] : { x: 1288, y: 676 };
+  const reach = ss(1.5, 4, tl) * (1 - ss(6.4, 8.4, tl));
+  const offer = ss(14.6, 16.6, tl) * (1 - ss(21, 23, tl));
+  const pick = tl > 6.3;
+  let mh = [SH.hn[0], SH.hn[1]];
+  const chest = [20, R.shY + 72];
+  if (pick) mh = [lerp(mh[0], chest[0], ss(6.4, 8.4, tl) * (1 - ss(21, 23, tl))), lerp(mh[1], chest[1], ss(6.4, 8.4, tl) * (1 - ss(21, 23, tl)))];
+  const cl = toLocal(M, cuke.x - 4, cuke.y + 2);
+  mh = [lerp(mh[0], cl[0], reach), lerp(mh[1], cl[1], reach)];
+  mh = [lerp(mh[0], 54, offer), lerp(mh[1], R.shY + 44, offer)];
+  const ml = toLocal(M, meet[0], meet[1]);
+  mh = [lerp(mh[0], ml[0], promise), lerp(mh[1], ml[1], promise)];
+  M.hn = mh;
+  const mHas = pick && tl < 20.5;
+  if (mHas) M.heldN = h => cucumber(this_g(), h[0], h[1], tl < 12.6 ? -.4 : .5, .78);
+  M.tilt = .1 * ss(21, 23, tl) * (1 - ss(28, 30, tl)) - .04 * promise;
+  // Sakiko: take, raise, hop, promise
+  const SH2 = gait(R, sw.ph, sw.amt);
+  let sh = sw.amt > .02 ? [SH2.hn[0], SH2.hn[1]] : [SH.hn[0], SH.hn[1]];
+  const mHandW = [M.x + mh[0] * s * M.f, Y + mh[1] * s];
+  const take = ss(17.8, 20.3, tl) * (1 - ss(21, 22.4, tl));
+  const tlocal = toLocal(S, mHandW[0] + 6, mHandW[1]);
+  sh = [lerp(sh[0], tlocal[0], take), lerp(sh[1], tlocal[1], take)];
+  const raise = ss(21.6, 23, tl) * (1 - ss(26.4, 27.6, tl));
+  sh = [lerp(sh[0], 14, raise), lerp(sh[1], R.headY - 40, raise)];
+  const sl = toLocal(S, meet[0], meet[1]);
+  sh = [lerp(sh[0], sl[0], promise), lerp(sh[1], sl[1], promise)];
+  S.hn = sh;
+  const hops = ss(22.4, 23, tl) * (1 - ss(25.6, 26.2, tl));
+  S.bob = -Math.abs(Math.sin(tl * 6.5)) * 9 * hops;
+  if (tl > 20.5 && tl < 27.6) S.heldN = h => cucumber(this_g(), h[0], h[1], -1.1 + raise * .6, .78);
+  if (tl >= 27.6) { S.hf = [12, R.shY + 70]; S.heldF = h => cucumber(this_g(), h[0], h[1], -.9, .74); }
+  if ((tl > 22.4 && tl < 27.2) || (tl > 31.5 && tl < 35)) S.eyes = 'closed';
+  S.tilt = .06 * ss(18, 19.5, tl) * (1 - ss(21, 22, tl)) + .05 * promise;
+  return { S, M, promise, meet, picked: pick };
+}
+let _g = null; const this_g = () => _g;
+function drDusk(g, tl, st) {
+  _g = g; const t = tl;
+  if (!TRELLIS) TRELLIS = makeTrellis();
+  const gy = x => 882 + 6 * Math.sin(x * .006);
+  g.fillStyle = '#4f6a3e'; g.beginPath(); g.moveTo(-600, 1300); for (let x = -600; x <= 2600; x += 40) g.lineTo(x, gy(x)); g.lineTo(2600, 1300); g.closePath(); g.fill();
+  grass(g, -600, 2600, gy, 7, 6, 18, t, '#4a6538', 3);
+  drawTrellis(g, TRELLIS, t, st.D.picked);
+  fig(g, st.D.M); fig(g, st.D.S);
+  grass(g, -600, 2600, x => 1004 + 10 * Math.sin(x * .01), 12, 26, 66, t, '#2f4527', 7, 1.4);
+  for (let i = 0; i < 26; i++) { const x = -300 + i * 103 + Math.sin(i * 7.1) * 30, y = 905 + (i % 4) * 22; ell(g, x, y, 3.4, 3.4, i % 3 ? '#f4f0e6' : '#f2d14a'); }
+}
+
+// ───────────────────────────────────────────────────────── 2a · Sakura walk
+let TREES = null;
+function walkDist(t) { let x = 0; const dt = 1 / 60; for (let u = 0; u < t; u += dt) x += 95 * (1 - ss(6.5, 8.5, u)) * Math.min(dt, t - u); return x; }
+function stWalk(tl) {
+  const st = baseState();
+  const X = walkDist(Math.max(0, tl)) + Math.min(0, tl) * 95;
+  st.cam = { x: 960 + X, y: 540, z: 1 + .035 * ss(8, 20, tl) };
+  st.X = X;
+  st.light = [1560, 170]; st.amb = [.95, .88, .92]; st.rim = [1, .93, .9]; st.omni = .18; st.rimW = 2.5;
+  st.parts = [{ type: 2, n: 240, p: [1, 38, .9, 1] }];
+  lensFlare(st, [1560, 170], .7, [1, .95, .9]);
+  st.grade = grade({ expo: 1.02, sat: .96, lift: [.05, .03, .06], gamma: 1, gain: [1.02, .98, 1], vig: .35, bloom: .45, th: .8, grain: .035, leak: .35, ca: .001 });
+  return st;
+}
+function drWalk(g, tl, st) {
+  _g = g;
+  if (!TREES) TREES = [makeTree(3), makeTree(8), makeTree(21)];
+  const R = RIG.teen, X = st.X, speed = 95 * (1 - ss(6.5, 8.5, tl)), amt = clamp(speed / 95);
+  for (let i = 0; i < 6; i++) { const tx = 520 + i * 820, tr = TREES[i % 3]; g.drawImage(tr, tx - 600, 836 - 920, 1200, 920); }
+  const ph = X / (4 * R.thigh * .24) * TAU;
+  const turn = tl > 8.8;
+  const M = { who: 'mutsu', view: 'side', f: 1, x: st.cam.x - 110, y: 890, s: .86, t: tl, walk: amt, ph: ph + 1.4, hairAmp: 1.1, wind: .35, case: true, eyes: blink(tl, .3) };
+  const S = { who: 'saki', view: 'side', f: turn ? -1 : 1, x: st.cam.x + 60, y: 912, s: .9, t: tl + 2, walk: amt, ph, hairAmp: 1.3, wind: turn ? -.35 : .35, eyes: blink(tl, .8) };
+  const off = ss(12.4, 14.4, tl);
+  const meet = [lerp(S.x, M.x, .5), 912 - 250];
+  if (off > 0) { const l = toLocal(S, lerp(S.x - 60, meet[0], ss(17.6, 19.4, tl)), lerp(912 - 260, meet[1], ss(17.6, 19.4, tl))); S.hn = [lerp(7, l[0], off), lerp(R.shY + 150, l[1], off)]; }
+  const take = ss(17.6, 19.4, tl);
+  if (take > 0) { const l = toLocal(M, meet[0] - 4, meet[1] + 4); M.hn = [lerp(4, l[0], take), lerp(R.shY + 150, l[1], take)]; }
+  const nod = ss(16.4, 16.8, tl) * (1 - ss(17, 17.6, tl));
+  M.headDY = 6 * nod; M.tilt = .14 * nod;
+  S.tilt = turn ? .05 : 0;
+  if (tl > 12.8 && tl < 14.6) S.eyes = 'closed';
+  fig(g, M); fig(g, S);
+  g.save(); g.setTransform(1, 0, 0, 1, 0, 0); const v = VIEW; g.setTransform(v.s, 0, 0, v.s, v.ox, v.oy);
+  g.drawImage(TREES[1], -900 + Math.sin(tl * .4) * 6, -620, 1560, 1196);
+  g.restore();
+}
+
+// ───────────────────────────────────────────────────────── 2b · Stage
+function stStage(tl) {
+  const st = baseState();
+  const b = (tl + 80) / BEAT; st.beat = b;
+  const on = ss(.05, 1.0, tl);
+  st.P0 = [on, b, 0, 0];
+  st.cam = { x: 960, y: 540 + 8 * Math.sin(tl * .25), z: kf(tl, [[0, 1.0], [14, 1.09], [20, 1.05]]) };
+  st.light = [960, 70]; st.amb = [.2, .17, .3]; st.rim = [.8, .86, 1.05]; st.omni = .7; st.rimW = 3.5;
+  const fy = W2S(st, 0, 862)[1]; st.refl = { y: fy, k: .3, rip: 0 };
+  st.parts = [{ type: 5, n: 130, p: [on, b, 0, 0] }];
+  for (let i = 0; i < 9; i++) st.flares.push([160 + i * 200, 135, 34, .35 * on * (.7 + .3 * Math.sin(tl * 2 + i)), 1, .92, .82, 1]);
+  st.flares.push([960, 470, 520, .05 * on * (1 + Math.cos(b * TAU)), .6, .5, 1, 0]);
+  st.grade = grade({ expo: 1.08, sat: 1.12, lift: [.02, 0, .05], gain: [1, .98, 1.06], vig: .55, bloom: .9, th: .48, grain: .05, ca: .0025 });
+  st.fadeW = .25 * Math.pow(1 - ss(.0, .5, tl), 2) * ss(-.1, .05, tl);
+  return st;
+}
+function drStage(g, tl, st) {
+  _g = g; const b = st.beat, bp = b % 1;
+  poly(g, [[-300, 862], [2200, 862], [2200, 875], [-300, 875]], '#121018');
+  for (const ax of [360, 1560]) { poly(g, [[ax - 80, 862], [ax + 80, 862], [ax + 80, 662], [ax - 80, 662]], '#1b1a21'); for (const yy of [712, 800]) ell(g, ax, yy, 46, 46, '#26252d'); }
+  g.strokeStyle = '#18171d'; g.lineWidth = 5; g.beginPath(); g.moveTo(960, 862); g.lineTo(960, 640); g.lineTo(985, 612); g.stroke(); ell(g, 990, 606, 9, 7, '#202027', -.6);
+  poly(g, [[930, 862], [990, 862], [960, 850]], '#18171d');
+  const S = { who: 'saki', view: 'front', x: 700, y: 862, s: .92, t: tl, eyes: 'closed', mouth: 'none', headDY: 3 * Math.abs(Math.sin(Math.PI * b)), tilt: .05 * Math.sin(tl * .9),
+    hl: [-62 + 14 * Math.sin(tl * 4.3), -266], hr: [58 + 12 * Math.sin(tl * 3.7 + 1), -266], preArms: g2 => keyboard(g2, 0, 0, 1), hairAmp: 1.1 };
+  const M = { who: 'mutsu', view: 'front', x: 1225, y: 862, s: .92, t: tl + 1, eyes: 'closed', mouth: 'none', guitar: true, strum: 11 * Math.sin(b * TAU * 2), tilt: -.07, headDY: 2 + 2 * Math.abs(Math.sin(Math.PI * b)) };
+  fig(g, S); fig(g, M);
+  const r = mulberry32(4);
+  for (let i = 0; i < 34; i++) { const x = -260 + i * 72 + r() * 30, y = 966 + r() * 26 + Math.abs(Math.sin(Math.PI * (b + r()))) * -7; ell(g, x, y, 22 + r() * 6, 26, '#0b0a10'); ell(g, x, y + 66, 54, 46, '#0b0a10'); }
+}
+
+// ───────────────────────────────────────────────────────── 3 · Rain
+function stRain(tl) {
+  const st = baseState();
+  st.cam = { x: kf(tl, [[0, 960], [10, 960], [30, 1078], [40, 1088]]), y: kf(tl, [[0, 540], [10, 540], [30, 575], [40, 580]]), z: kf(tl, [[0, 1.0], [10, 1.0], [30, 1.2], [40, 1.23]]) };
+  const lamp = W2S(st, 1236, 336);
+  const flash = (tl > 4.8 && tl < 5.4 ? .35 * Math.abs(Math.sin((tl - 4.8) * 18)) : 0) + (tl > 38.9 && tl < 39.3 ? 1 : 0) + ss(39.4, 40, tl);
+  st.P0 = [lamp[0], lamp[1], 1, 0]; st.P1 = [flash, 0, 0, 0];
+  st.light = lamp; st.amb = [.12, .15, .23]; st.rim = [1, .82, .58]; st.omni = .3;
+  st.refl = { y: W2S(st, 0, 905)[1], k: .5, rip: 2.2 };
+  st.parts = [{ type: 3, n: 1200, p: [ss(-1, 1.5, tl), -170, 0, 0], p2: [lamp[0], lamp[1], 0, 0] }];
+  st.flares.push([lamp[0], lamp[1] + 4, 60 * st.cam.z, .9, 1, .84, .6, 1]);
+  st.flares.push([lamp[0], lamp[1] + 4, 200 * st.cam.z, .2, 1, .8, .55, 0]);
+  st.emis = true; st.lens = .0018 * ss(1, 5, tl);
+  st.fadeW = (tl > 38.9 && tl < 39.25 ? .55 : 0);
+  st.grade = grade({ expo: 1.02, sat: .78, lift: [0, .02, .05], gamma: 1.04, gain: [.92, 1, 1.1], vig: .65, bloom: .72, th: .5, grain: .06, ca: .0025 });
+  return st;
+}
+function drRain(g, tl, st, e) {
+  _g = g; const R = RIG.teen;
+  g.fillStyle = '#26272e'; g.fillRect(1284, 300, 12, 612);
+  g.strokeStyle = '#26272e'; g.lineWidth = 9; g.lineCap = 'round'; g.beginPath(); g.moveTo(1290, 306); g.quadraticCurveTo(1290, 286, 1250, 300); g.stroke();
+  poly(g, [[1214, 336], [1258, 336], [1250, 316], [1222, 316]], '#2b2c34');
+  e.save(); e.setTransform(g.getTransform()); e.fillStyle = 'rgba(255,214,150,.95)'; e.beginPath(); e.ellipse(1236, 338, 16, 5, 0, 0, TAU); e.fill(); e.restore();
+  const mPos = t => 420 + (1105 - 420) * clamp((t - 9) / 14) - 0;
+  const mpos = t => { const u = clamp((t - 9) / 14); return 420 + (1062 - 420) * (u < .1 ? u * u * 5 : u > .9 ? .9 - (1 - u) * (1 - u) * 5 : u - .05) / .9; };
+  const mw = walkInfo(mpos, tl, R, 50);
+  const raise = ss(23.2, 27, tl);
+  const M = { who: 'mutsu', view: 'side', f: 1, x: mw.x, y: 905, s: .9, t: tl, walk: mw.amt * .9, ph: mw.ph, hairAmp: .4, eyes: 'open',
+    e, hn: [lerp(22, 66, raise), lerp(R.shY + 66, R.shY + 18, raise)], heldN: h => umbrella(this_g(), h[0], h[1], lerp(.03, .3, raise), 1, e) };
+  const tremble = ss(33, 33.6, tl) * (1 - ss(37, 38, tl));
+  const S = { who: 'saki', view: 'back', x: 1214, y: 905, s: .9, t: tl + 4, hairAmp: .25, headDY: 8 - 3 * ss(34, 37, tl), tilt: -.1 * ss(34, 37.5, tl), bob: Math.sin(tl * 23) * 1.1 * tremble };
+  fig(g, S); fig(g, M);
+}
+
+// ───────────────────────────────────────────────────────── 4 · Masquerade
+const jerk = t => Math.floor(t) + ss(0, .38, t - Math.floor(t));
+function stMask(tl) {
+  const st = baseState();
+  st.cam = { x: kf(tl, [[0, 960], [20, 980], [26, 1075]]), y: kf(tl, [[0, 560], [26, 585]]), z: kf(tl, [[0, 1.0], [20, 1.08], [26, 1.24], [28.4, 1.3]]) };
+  const wc = W2S(st, 960, 392, .2), zf = 1 + (st.cam.z - 1) * .2;
+  st.P0 = [wc[0], wc[1], 285 * zf, 0];
+  st.light = wc; st.amb = [.17, .06, .08]; st.rim = [1.1, .46, .52]; st.omni = .45;
+  st.refl = { y: W2S(st, 0, 905)[1], k: .35, rip: 0 };
+  st.parts = [{ type: 4, n: 130, p: [1, 22, .5, 1] }];
+  st.emis = true;
+  st.flares.push([wc[0], wc[1], 330 * zf, .12, 1, .45, .5, 0]);
+  st.grade = grade({ expo: 1.04, sat: 1.12, lift: [.03, 0, .015], gain: [1.06, .95, .98], vig: .7, bloom: .85, th: .5, grain: .06, ca: .003 });
+  st.shatter = 27.2;
+  if (tl > st.shatter) st.parts.push({ type: 6, n: 90, p: [1, st.shatter, 0, 0], p2: [1170 + 0, 905 - 462 * .95 + 4, 0, 0] });
+  return st;
+}
+function drMask(g, tl, st, e) {
+  _g = g; const R = RIG.teen, s = .95;
+  curtain(g, -320, 340, tl, true); curtain(g, 1580, 2240, tl, false);
+  poly(g, [[-300, 905], [2300, 905], [2300, 915], [-300, 915]], '#120507');
+  // Sakiko — Oblivionis
+  const u = ss(3, 6, tl) * (1 - ss(17, 19.5, tl));
+  const face = [-6, R.headY + 16];
+  const hang = [-R.shW - 12, R.shY + R.upper + R.fore - 10];
+  const reachS = ss(20, 24, tl);
+  const S = { who: 'saki', view: 'front', outfit: 'gownS', x: 760, y: 905, s, t: tl, e, eyes: 'closed', mouth: 'none', tilt: .06 * ss(19, 21, tl),
+    hl: [lerp(hang[0], face[0], u), lerp(hang[1], face[1], u)], mask: u > .97 ? 1 : 0, maskGlow: 1 };
+  const reachL = toLocal(S, 930, 650);
+  S.hr = [lerp(R.shW + 10, reachL[0], reachS), lerp(R.shY + R.upper + R.fore - 6, reachL[1], reachS)];
+  if (u <= .97) S.heldL = h => drawMask(g, e, h[0] + 4, h[1] - 6, .9, -.5 + u * .5, 'saki', 0, .8);
+  if (tl > 19.5) S.eyes = 'open';
+  // Mutsumi — Mortis, marionette
+  const snap = 21.5, cut = tl > snap;
+  const j1 = jerk(tl * 1.25), j2 = jerk(tl * 1.25 + .5);
+  const drop = ss(snap, snap + .9, tl), rise = ss(23, 26, tl);
+  const M = { who: 'mutsu', view: 'front', outfit: 'gownM', x: 1170, y: 905, s, t: tl + 2, e, eyes: 'none', mouth: 'none', mask: tl < st.shatter ? 1 : 0, crack: ss(25.4, 27.0, tl) };
+  const pl = [-74 - 22 * Math.sin(j1 * 1.3), -430 - 70 * Math.max(0, Math.sin(j1 * .9))];
+  const pr = [74 + 22 * Math.sin(j2 * 1.1), -410 - 80 * Math.max(0, Math.sin(j2 * 1.2 + 1))];
+  const restL = [-R.shW - 9, R.shY + R.upper + R.fore - 4], restR = [R.shW + 9, R.shY + R.upper + R.fore - 4];
+  const reachM = toLocal(M, 990, 652);
+  let hl = [lerp(pl[0], restL[0], drop), lerp(pl[1], restL[1], drop)], hr = [lerp(pr[0], restR[0], drop), lerp(pr[1], restR[1], drop)];
+  hl = [lerp(hl[0], reachM[0], rise), lerp(hl[1], reachM[1], rise)];
+  M.hl = hl; M.hr = hr;
+  M.tilt = (1 - drop) * .14 * Math.sin(jerk(tl * .9) * 1.7) + .22 * drop * (1 - rise) - .06 * rise;
+  M.headDY = 10 * drop * (1 - rise); M.bob = -6 * Math.max(0, Math.sin(j1 * 2)) * (1 - drop) + 6 * drop * (1 - rise);
+  fig(g, S); fig(g, M);
+  // strings (emissive)
+  e.save(); e.setTransform(g.getTransform());
+  const W = (lx, ly) => [M.x + lx * s, M.y + ly * s];
+  const hcM = W(M.tilt * 30, R.headY - 34 + (M.headDY || 0) + (M.bob || 0));
+  const ends = [W(hl[0], hl[1]), W(hr[0], hr[1]), hcM];
+  const tops = [[1060, 40], [1290, 40], [1172, 20]];
+  e.lineWidth = 1.3; e.lineCap = 'round';
+  ends.forEach((p, i) => {
+    const top = tops[i];
+    if (!cut) { e.strokeStyle = 'rgba(255,214,150,.55)'; e.beginPath(); e.moveTo(top[0], top[1]); e.quadraticCurveTo(lerp(top[0], p[0], .5) + Math.sin(tl * 2 + i) * 4, lerp(top[1], p[1], .5), p[0], p[1]); e.stroke(); }
+    else { const k = clamp((tl - snap) / 1.4); if (k < 1) { e.strokeStyle = `rgba(255,214,150,${.6 * (1 - k)})`; const cy = lerp(p[1] - 40, top[1], easeIO(k)); e.beginPath(); e.moveTo(top[0], top[1]); e.quadraticCurveTo(top[0] + Math.sin(k * 9 + i) * 30, (top[1] + cy) / 2, lerp(p[0], top[0], k * .7), cy); e.stroke(); } }
+  });
+  e.restore();
+  if (cut && tl < snap + 1.2) { const k = 1 - (tl - snap) / 1.2; ends.forEach(p => { const q = W2S(st, p[0], p[1] - 40); st.flares.push([q[0], q[1], 60 * st.cam.z, 1.1 * k, 1, .86, .6, 1]); }); }
+  if (tl > st.shatter - .3 && tl < st.shatter + .6) { const q = W2S(st, M.x, M.y + (R.headY + 6) * s); st.flares.push([q[0], q[1], 240 * st.cam.z, 1.4 * (1 - Math.abs(tl - st.shatter) / .6), 1, .95, .9, 1]); }
+  st.parts.forEach(p => { if (p.type === 6) p.p2 = [M.x, M.y + (R.headY + 10) * s, 0, 0]; });
+}
+
+// ───────────────────────────────────────────────────────── 5 · Beneath the stars → dawn
+const HILL = x => 868 + Math.pow((x - 960) / 900, 2) * 150 + 4 * Math.sin(x * .01);
+const SHOTS = { closeA: 13.8, closeB: 25.6 };
+function stStars(tl) {
+  const st = baseState();
+  const close = tl > SHOTS.closeA && tl < SHOTS.closeB;
+  const dawn = ss(47, 63, tl);
+  const aur = (.35 + .65 * ss(28, 40, tl)) * (1 - dawn);
+  if (tl < SHOTS.closeA) st.cam = { x: 960, y: kf(tl, [[0, 250], [1, 250], [11, 540]]), z: kf(tl, [[0, 1.0], [8, 1.0], [13.8, 1.12]]) };
+  else if (close) st.cam = { x: 960, y: 540, z: 1 + .05 * ss(13.8, 25.6, tl) };
+  else st.cam = { x: kf(tl, [[25.6, 962], [36, 960]]), y: kf(tl, [[25.6, 770], [34, 760], [40, 560], [46, 540], [55, 440], [62, 470], [71.7, 500]]), z: kf(tl, [[25.6, 1.75], [34, 1.68], [40, 1.04], [55, 1.0]]) };
+  const sunW = [1380, kf(tl, [[55, 880], [71.7, 712]], t => t)];
+  const sun = W2S(st, sunW[0], sunW[1], .1);
+  st.P0 = [dawn, close ? 1 : 0, aur, 0]; st.P1 = [sun[0], sun[1], 0, 0];
+  st.met = [1500, 120, 34.7, 2.55, 520, 90, 37.7, .62, 1250, 60, 40.2, 2.6, 820, 140, 42.7, 2.45];
+  st.amb = mix3([.16, .2, .32], [.52, .4, .46], dawn);
+  st.rim = mix3([.4, .5, .8], [1.1, .8, .52], dawn);
+  st.light = close ? [960, -300] : [lerp(960, sun[0], dawn), lerp(120, sun[1], dawn)];
+  st.omni = .12; st.rimW = 2.1;
+  st.fadeB = Math.max(1 - ss(0, .45, Math.abs(tl - SHOTS.closeA)), 1 - ss(0, .45, Math.abs(tl - SHOTS.closeB)), ss(70.4, 71.6, tl));
+  const night = { expo: 1.06, sat: 1.06, lift: [0, .01, .045], gamma: 1, gain: [.98, 1, 1.06], vig: .55, bloom: .8, th: .5, grain: .045, ca: .0015, leak: 0 };
+  const day = { expo: 1.04, sat: 1.1, lift: [.03, .01, .02], gamma: .98, gain: [1.07, 1, .93], vig: .5, bloom: .72, th: .6, grain: .04, ca: .0015, leak: .3 };
+  st.grade = lerpGrade(grade(night), grade(day), dawn);
+  if (close) {
+    st.amb = [.34, .38, .5]; st.rim = [.42, .52, .8]; st.omni = .1; st.light = [960, 380];
+    st.parts = [{ type: 1, n: 46, p: [.9, 1], p2: [200, 300, 1720, 900] }];
+  } else {
+    st.parts = [{ type: 1, n: 50, p: [.8 * (1 - dawn * .8), 1], p2: [560, 700, 1360, 900] }, { type: 7, n: 150, p: [ss(44, 48, tl) * (1 - ss(58, 64, tl)), 0], p2: [640, 0, 1280, 880] }];
+    twinLights(st, [960, 255], tl, ss(44, 47.5, tl) * (1 - ss(57, 63, tl)), 62, 8);
+    if (dawn > .3) lensFlare(st, sun, ss(.3, 1, dawn) * ss(56, 64, tl), [1, .8, .55]);
+  }
+  st.close = close;
+  return st;
+}
+function lerpGrade(a, b, t) { const o = {}; for (const k in a) o[k] = Array.isArray(a[k]) ? mix3(a[k], b[k], t) : lerp(a[k], b[k], t); return o; }
+function drStars(g, tl, st) {
+  _g = g;
+  if (st.close) return drHands(g, tl, st);
+  const t = tl;
+  g.fillStyle = '#21352a'; g.beginPath(); g.moveTo(-500, 1400); for (let x = -500; x <= 2500; x += 30) g.lineTo(x, HILL(x)); g.lineTo(2500, 1400); g.closePath(); g.fill();
+  grass(g, -500, 2500, HILL, 6, 9, 28, t, '#2b4535', 11);
+  const R = RIG.teen, Y = 868;
+  const held = tl > SHOTS.closeB;
+  const meet = [961, 900];
+  const S = { who: 'saki', view: 'back', pose: 'sit', x: 905, y: Y, s: .92, t, hairAmp: .7, wind: .12 };
+  const M = { who: 'mutsu', view: 'back', pose: 'sit', x: 1017, y: Y, s: .9, t: t + 2, hairAmp: .7, wind: .12 };
+  S.hl = [-88, 30]; S.hr = [84, 32]; M.hl = [-82 - 8 * ss(9, 13.6, tl), 32]; M.hr = [88, 30];
+  if (held) { S.hr = toLocal(S, meet[0] - 4, meet[1]); M.hl = toLocal(M, meet[0] + 4, meet[1] - 1); }
+  const u = ss(30.7, 33.7, tl);
+  M.tilt = -.36 * u; M.headDX = -9 * u; M.lean = -.07 * u;
+  S.tilt = .1 * u; S.headDX = 3 * u;
+  fig(g, S); fig(g, M);
+  for (let i = 0; i < 9; i++) { const x = 700 + i * 70 + Math.sin(i * 3.3) * 20; const y = HILL(x) + 6 + (i % 3) * 5; for (let k = 0; k < 5; k++) ell(g, x + Math.cos(k * 1.256) * 3.4, y + Math.sin(k * 1.256) * 3.4, 2.8, 2.8, '#e9e9f3'); }
+  if (held) { const p = W2S(st, meet[0], meet[1] - 2); st.flares.push([p[0], p[1], 30 * st.cam.z, .3 * (.7 + .3 * Math.sin(tl * 2.2)), 1, .85, .65, 0]); }
+}
+function drHands(g, tl, st) {
+  const k = tl - SHOTS.closeA;
+  const grd = g.createRadialGradient(960, 540, 80, 960, 540, 1150); grd.addColorStop(0, '#3e634d'); grd.addColorStop(.55, '#22392c'); grd.addColorStop(1, '#101b15');
+  g.fillStyle = grd; g.fillRect(-600, -200, 3200, 1500);
+  const lr = mulberry32(12); for (let i = 0; i < 26; i++) ell(g, lr() * 1920, 120 + lr() * 860, 60 + lr() * 140, 14 + lr() * 22, lr() < .5 ? '#30513d' : '#203628', (lr() - .5) * .3);
+  const fr = mulberry32(77); for (let i = 0; i < 46; i++) { const x = fr() * 1920, y = 130 + fr() * 840, c = fr() < .7 ? '#eceef5' : '#f0d470'; if (Math.abs(y - 560) < 110 && Math.abs(x - 960) < 520) continue; for (let k2 = 0; k2 < 5; k2++) ell(g, x + Math.cos(k2 * 1.256) * 4.5, y + Math.sin(k2 * 1.256) * 4.5, 3.8, 3.8, c); ell(g, x, y, 2.2, 2.2, '#f3d36a'); }
+  const sx = kf(k, [[0, 560], [5.8, 770], [7, 776], [10, 724]]);
+  const mx = kf(k, [[0, 1500], [5.8, 1146], [7, 1140], [10, 1000]]);
+  const my = kf(k, [[0, 590], [7, 584], [10, 552]]);
+  const sa = kf(k, [[0, 1.62], [7, 1.6], [10, 1.52]]), ma = kf(k, [[0, -1.6], [7, -1.58], [10, -1.66]]);
+  const sp = .5 + .8 * ss(7.2, 10, k);
+  hand(g, sx, 560, sa, 1.55, false, sp, PAL.skin, '#e8ebf3', '#2c3152');
+  hand(g, mx, my, ma, 1.5, true, sp, PAL.skin, '#e8ebf3', '#2c3152');
+  const tip = (x, y, a, s, m) => { const lx = (m ? 1 : -1) * 9, ly = -118; return [x + (Math.cos(a) * lx - Math.sin(a) * ly) * s, y + (Math.sin(a) * lx + Math.cos(a) * ly) * s]; };
+  const pa = tip(sx, 560, sa, 1.55, false), pb = tip(mx, my, ma, 1.5, true);
+  const touch = ss(5.4, 6.2, k);
+  if (touch > 0) { const c = [(pa[0] + pb[0]) / 2, (pa[1] + pb[1]) / 2]; const q = W2S(st, c[0], c[1]); st.flares.push([q[0], q[1], 100, .95 * touch * (1 - .45 * ss(8, 11, k)) * (.8 + .2 * Math.sin(tl * 4)), 1, .86, .62, 1]); st.flares.push([q[0], q[1], 320, .14 * touch, .6, .8, 1, 0]); }
+}
+
+const SCENES = [
+  { key: 'prologue', t0: 0, t1: 20, bg: 0, state: stPrologue, draw: null },
+  { key: 'dusk', t0: 20, t1: 60, bg: 1, state: stDusk, draw: drDusk },
+  { key: 'walk', t0: 60, t1: 80, bg: 2, state: stWalk, draw: drWalk },
+  { key: 'stage', t0: 80, t1: 100, bg: 3, state: stStage, draw: drStage },
+  { key: 'rain', t0: 100, t1: 140, bg: 4, state: stRain, draw: drRain },
+  { key: 'mask', t0: 140, t1: 168.33, bg: 5, state: stMask, draw: drMask },
+  { key: 'stars', t0: 168.33, t1: 240, bg: 6, state: stStars, draw: drStars },
+];
+const TRANS = [
+  { at: 20, dur: 2.6, style: 'dissolve', edge: [1, .75, .45] },
+  { at: 60, dur: 2.2, style: 'dissolve', edge: [1, .62, .8] },
+  { at: 80, dur: 1.3, style: 'black' },
+  { at: 100, dur: 2.8, style: 'dissolve', edge: [.45, .65, 1] },
+  { at: 140, dur: 1.1, style: 'white' },
+  { at: 168.33, dur: 2.4, style: 'white' },
+];
+
+// ───────────────────────────────────────────────────────── text cues
+const CHAPTERS = [
+  { t0: 21, t1: 26, num: '壹', title: '黄瓜与夕阳', en: 'I · Cucumbers at Dusk', at: 20 },
+  { t0: 61, t1: 66, num: '贰', title: '春日', en: 'II · Spring Days', at: 60 },
+  { t0: 101.2, t1: 106.2, num: '叁', title: '雨夜', en: 'III · The Rain', at: 100 },
+  { t0: 141, t1: 146, num: '肆', title: '假面', en: 'IV · Masquerade', at: 140 },
+  { t0: 171, t1: 176, num: '终', title: '星空之下', en: 'V · Beneath the Stars', at: 168.33 },
+];
+const SUBS = [
+  [1.8, 5.8, 'n', '如果回忆也有颜色——'],
+  [23.6, 27.6, 'n', '那是很久以前的一个夏天。'],
+  [28.2, 31.8, 'n', '她总是一个人，蹲在黄瓜藤下。'],
+  [34.6, 37.4, 'm', '「……给你。」'],
+  [38.6, 41.6, 's', '「诶？是……黄瓜？」'],
+  [43, 46.4, 's', '「谢谢你，睦！我会好好珍惜的。」'],
+  [46.8, 50.8, 'n', '那天的夕阳，比钢琴的音色还要温柔。'],
+  [51.6, 54.8, 's', '「约好了哦，以后也要一直在一起。」'],
+  [55.6, 58.4, 'm', '「……嗯。」'],
+  [63.2, 67.2, 'n', '樱花开了又落，我们都长大了。'],
+  [68.6, 72, 's', '「睦，我想组一支乐队。」'],
+  [72.6, 76, 's', '「你愿意……为我弹吉他吗？」'],
+  [76.6, 79.4, 'm', '「……嗯。祥想要的话。」'],
+  [82.2, 86.2, 'n', '第一次站上舞台的那一天，'],
+  [86.6, 90.6, 'n', '你的琴声和我的吉他，交织在一起。'],
+  [92, 97, 'n', '那是我见过的，最耀眼的春日。'],
+  [103.6, 107.4, 'n', '然后，春天结束了。'],
+  [108.6, 112.6, 'n', '那个雨夜，你一个人离开了。'],
+  [114, 118.2, 'n', '我不知道该说些什么，只是没办法停下脚步。'],
+  [122, 125, 'm', '「……祥。」'],
+  [128, 132, 'n', '至少，不想让你一个人淋雨。'],
+  [133.6, 137.6, 's', '「……为什么，你总是这样。」'],
+  [143.2, 147.2, 'n', '我们戴上面具，站上了另一座舞台。'],
+  [148.2, 152.4, 'n', '被看不见的丝线牵引着，扮演着别人。'],
+  [154, 157.6, 's', '「如果戴着面具，就能忘记一切的话——」'],
+  [158.6, 162.2, 'm', '「……我不想忘记。」'],
+  [162.8, 166.4, 'm', '「我想用自己的声音，叫你的名字。」'],
+  [172.6, 176.6, 'n', '后来，在一个星星很多的夜晚，'],
+  [177.2, 181.2, 'n', '我们又一次，并肩坐在了一起。'],
+  [183.2, 187.4, 'n', '指尖之间，只隔着一点点夜风。'],
+  [190.8, 192.8, 's', '「睦。」'],
+  [193.4, 195.4, 'm', '「……嗯。」'],
+  [196, 199.8, 's', '「谢谢你，一直在等我。」'],
+  [201.4, 205, 'm', '「因为……是祥啊。」'],
+  [206, 209.6, 'm', '「无论戴上多少张面具，」'],
+  [210, 213.6, 'm', '「我都会找到你。」'],
+  [214.6, 218.6, 's', '在所有想要忘却的回忆里，'],
+  [219, 223, 's', '唯独你，我一次也没有忘记。'],
+  [224.6, 228, 'n', '夜晚过去了。'],
+  [228.6, 232.2, 'n', '而你，还在我身边。'],
+];
+const TITLES = [{ t0: 6.6, t1: 17.6 }, { t0: 233.2, t1: 239.4, end: true }];
+
+// =====================================================================
+//  MAIN — clock, render pipeline, text overlay, controls
+// =====================================================================
+const DURATION = 240;
+const $ = id => document.getElementById(id);
+const QS = new URLSearchParams(location.search);
+const TEST = QS.has('test');
+const canvas = $('gl');
+const VIEW = { s: 1, ox: 0, oy: 0, css: 1 };
+const MET0 = new Float32Array(16).fill(-99);
+let R = null, quality = 1, engine = null, started = false;
+const lay = document.createElement('canvas'), emi = document.createElement('canvas');
+const g2 = lay.getContext('2d'), ge = emi.getContext('2d');
+
+try { R = new Renderer(canvas, TEST); } catch (err) {
+  console.error(err);
+  $('s-note').textContent = '这台设备的浏览器无法运行 WebGL2，短片没法播放。请换用最新版的 Chrome、Edge、Safari 或 Firefox 打开。';
+  $('play-btn').disabled = true;
+}
+
+function layout() {
+  if (!R) return;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2), cw = window.innerWidth, ch = window.innerHeight;
+  let W = Math.round(cw * dpr * quality), H = Math.round(ch * dpr * quality);
+  const maxPix = 2.3e6; if (W * H > maxPix) { const k = Math.sqrt(maxPix / (W * H)); W = Math.round(W * k); H = Math.round(H * k); }
+  R.resize(W, H);
+  if (lay.width !== W || lay.height !== H) { lay.width = emi.width = W; lay.height = emi.height = H; }
+  const s = Math.min(H / 1080, W / 1440);
+  VIEW.s = s; VIEW.ox = (W - 1920 * s) / 2; VIEW.oy = (H - 1080 * s) / 2; VIEW.css = cw / W;
+  const k = VIEW.css, st = document.documentElement.style, u = s * k;
+  st.setProperty('--u', u.toFixed(4));
+  st.setProperty('--subY', ((VIEW.oy + 1030 * s) * k).toFixed(1) + 'px');
+  st.setProperty('--midY', ((VIEW.oy + 520 * s) * k).toFixed(1) + 'px');
+  st.setProperty('--cardX', Math.max(18, (VIEW.ox + 150 * s) * k).toFixed(1) + 'px');
+  st.setProperty('--cardY', ((VIEW.oy + 150 * s) * k).toFixed(1) + 'px');
+}
+
+const sceneAt = T => { let s = SCENES[0]; for (const x of SCENES) if (T >= x.t0) s = x; return s; };
+const pxOf = p => [VIEW.ox + p[0] * VIEW.s, R.H - (VIEW.oy + p[1] * VIEW.s)];
+
+function renderScene(sc, tl, rt) {
+  const st = sc.state(tl);
+  R.target(rt); R.blend(null);
+  const common = { uRes: [R.W, R.H], uView: [VIEW.ox, VIEW.oy, VIEW.s], uCam: [st.cam.x, st.cam.y, st.cam.z] };
+  R.use(R.pBg, Object.assign({ uT: tl, uScene: sc.bg, uP0: st.P0, uP1: st.P1, uP2: st.P2, uMet: st.met ? new Float32Array(st.met) : MET0 }, common));
+  R.fs();
+  if (sc.draw) {
+    g2.setTransform(1, 0, 0, 1, 0, 0); g2.clearRect(0, 0, lay.width, lay.height);
+    if (st.emis) { ge.setTransform(1, 0, 0, 1, 0, 0); ge.clearRect(0, 0, emi.width, emi.height); }
+    const z = st.cam.z * VIEW.s;
+    const M = [z, 0, 0, z, VIEW.ox + VIEW.s * (960 - st.cam.x * st.cam.z), VIEW.oy + VIEW.s * (540 - st.cam.y * st.cam.z)];
+    g2.setTransform(...M); if (st.emis) ge.setTransform(...M);
+    sc.draw(g2, tl, st, ge);
+    R.upload(R.texL, lay); if (st.emis) R.upload(R.texE, emi);
+    R.blend('over');
+    R.use(R.pLayer, {
+      uL: { tex: R.texL }, uE: { tex: R.texE }, uTx: [1 / R.W, 1 / R.H], uLight: pxOf(st.light), uAmb: st.amb, uRim: st.rim,
+      uRimW: Math.max(1.5, st.rimW * VIEW.s * st.cam.z), uOmni: st.omni, uEmis: st.emis ? 1.7 : 0,
+      uReflY: st.refl ? R.H - (VIEW.oy + st.refl.y * VIEW.s) : -1, uReflK: st.refl ? st.refl.k : 0, uRip: st.refl ? st.refl.rip * VIEW.s : 0, uT: tl,
+    });
+    R.fs();
+  }
+  const vis = [-VIEW.ox / VIEW.s, -VIEW.oy / VIEW.s, (R.W - VIEW.ox) / VIEW.s, (R.H - VIEW.oy) / VIEW.s];
+  R.particles(Object.assign({ uT: tl, uVis: vis }, common), st.parts);
+  R.flares(common, st.flares);
+  R.blend(null);
+  return st;
+}
+
+function post(src, gr, fb, fw, lens, T) {
+  R.blend(null);
+  R.target(R.h); R.use(R.pBright, { uS: { tex: src.t }, uTh: gr.th }); R.fs();
+  R.target(R.q1); R.use(R.pBlur, { uS: { tex: R.h.t }, uD: [1 / R.h.w, 0] }); R.fs();
+  R.target(R.q2); R.use(R.pBlur, { uS: { tex: R.q1.t }, uD: [0, 1 / R.q1.h] }); R.fs();
+  R.target(R.e1); R.use(R.pBlur, { uS: { tex: R.q2.t }, uD: [1.5 / R.q2.w, 0] }); R.fs();
+  R.target(R.e2); R.use(R.pBlur, { uS: { tex: R.e1.t }, uD: [0, 1.5 / R.e1.h] }); R.fs();
+  R.target(R.e1); R.use(R.pBlur, { uS: { tex: R.e2.t }, uD: [2.2 / R.e2.w, 0] }); R.fs();
+  R.target(R.e2); R.use(R.pBlur, { uS: { tex: R.e1.t }, uD: [0, 2.2 / R.e1.h] }); R.fs();
+  R.target(null);
+  R.use(R.pFinal, {
+    uRes: [R.W, R.H], uView: [VIEW.ox, VIEW.oy, VIEW.s], uS: { tex: src.t }, uB1: { tex: R.q2.t }, uB2: { tex: R.e2.t }, uT: T,
+    uBloom: gr.bloom, uExpo: gr.expo, uSat: gr.sat, uGamma: gr.gamma, uVig: gr.vig, uGrain: gr.grain, uFadeB: clamp(fb), uFadeW: clamp(fw),
+    uCA: gr.ca, uLens: lens, uLeak: gr.leak, uBox: gr.box, uLift: gr.lift, uGain: gr.gain,
+  });
+  R.fs();
+}
+
+function renderAt(T, opt = {}) {
+  if (!R) return;
+  T = clamp(T, 0, DURATION);
+  let tr = null; for (const x of TRANS) if (T >= x.at - x.dur / 2 && T < x.at + x.dur / 2) { tr = x; break; }
+  let src, gr, fb, fw, lens;
+  if (tr && tr.style === 'dissolve') {
+    const A = sceneAt(tr.at - .001), B = sceneAt(tr.at + .001), k = ss(tr.at - tr.dur / 2, tr.at + tr.dur / 2, T);
+    const sa = renderScene(A, T - A.t0, R.A), sb = renderScene(B, T - B.t0, R.B);
+    R.target(R.M); R.blend(null); R.use(R.pMix, { uRes: [R.W, R.H], uA: { tex: R.A.t }, uB: { tex: R.B.t }, uK: k, uEdge: tr.edge }); R.fs();
+    src = R.M; gr = lerpGrade(sa.grade, sb.grade, k); fb = lerp(sa.fadeB, sb.fadeB, k); fw = lerp(sa.fadeW, sb.fadeW, k); lens = lerp(sa.lens, sb.lens, k);
+  } else {
+    const sc = sceneAt(T), st = renderScene(sc, T - sc.t0, R.A);
+    src = R.A; gr = st.grade; fb = st.fadeB; fw = st.fadeW; lens = st.lens;
+    if (tr) { const a = T < tr.at ? ss(tr.at - tr.dur / 2, tr.at, T) : 1 - ss(tr.at, tr.at + tr.dur / 2, T); if (tr.style === 'black') fb = Math.max(fb, a); else fw = Math.max(fw, a); }
+  }
+  if (opt.poster) { gr = Object.assign({}, gr, { box: 0 }); fb = Math.max(fb, .25); }
+  post(src, gr, fb, fw, lens, T);
+  if (!opt.poster) updateText(T); else hideText();
+}
+
+// ---------------------------------------------------------------- text overlay
+const subEls = SUBS.map(([t0, t1, who, text]) => { const d = document.createElement('div'); d.className = 'sub ' + who; d.textContent = text; $('subs').appendChild(d); return d; });
+const cardEl = $('card'), titleEl = $('title'), creditEl = $('credit');
+const fade = (T, t0, t1, a = .55, b = .7) => ss(t0, t0 + a, T) * (1 - ss(t1 - b, t1, T));
+let lastCard = -1;
+function setO(el, o) { const v = o < .003 ? 0 : o; if (el._o === v) return; el._o = v; el.style.opacity = v.toFixed(3); el.style.visibility = v ? 'visible' : 'hidden'; }
+function updateText(T) {
+  SUBS.forEach(([t0, t1], i) => { const o = fade(T, t0, t1); setO(subEls[i], o); if (o) subEls[i].style.transform = `translateY(calc(-50% + ${(1 - ss(t0, t0 + .8, T)) * 6}px))`; });
+  let ci = -1, co = 0;
+  CHAPTERS.forEach((c, i) => { const o = fade(T, c.t0, c.t1, 1, 1.1); if (o > co) { co = o; ci = i; } });
+  if (ci !== lastCard && ci >= 0) { const c = CHAPTERS[ci]; cardEl.querySelector('.c-num').textContent = c.num; cardEl.querySelector('.c-title').textContent = c.title; cardEl.querySelector('.c-en').textContent = c.en; lastCard = ci; }
+  setO(cardEl, co);
+  if (ci >= 0) cardEl.style.setProperty('--sp', (1 - ss(CHAPTERS[ci].t0, CHAPTERS[ci].t0 + 3, T)).toFixed(3));
+  let to = 0, end = false; for (const x of TITLES) { const o = fade(T, x.t0, x.t1, 1.6, 1.4); if (o > to) { to = o; end = !!x.end; } }
+  setO(titleEl, to); titleEl.classList.toggle('end', end);
+  if (to) titleEl.style.setProperty('--sp', (1 - ss(end ? 233.2 : 6.6, (end ? 233.2 : 6.6) + 5, T)).toFixed(3));
+  setO(creditEl, fade(T, 235.2, 239.4, 1.2, 1.2));
+}
+function hideText() { subEls.forEach(e => setO(e, 0)); setO(cardEl, 0); setO(titleEl, 0); setO(creditEl, 0); }
+
+// ---------------------------------------------------------------- clock + transport
+const clock = { playing: false, pos: 0, t0: 0, sync: false };
+function now() {
+  if (!clock.playing) return clock.pos;
+  if (engine && clock.sync) return engine.songTime();
+  return clock.pos + (performance.now() - clock.t0) / 1000;
+}
+async function play() {
+  if (clock.pos >= DURATION - .05) clock.pos = 0;
+  clock.playing = true; clock.t0 = performance.now(); clock.sync = false; updateUI();
+  if (engine) {
+    try { await engine.ctx.resume(); } catch (e) { }
+    if (!clock.playing) return;
+    clock.pos = now(); clock.t0 = performance.now();
+    engine.startAt(clock.pos); clock.sync = true;
+  }
+  try { navigator.wakeLock && navigator.wakeLock.request('screen').catch(() => { }); } catch (e) { }
+}
+function pause() {
+  clock.pos = now(); clock.playing = false; clock.sync = false;
+  if (engine) { engine.stopAll(); engine.ctx.suspend().catch(() => { }); }
+  updateUI();
+}
+function seek(t) {
+  t = clamp(t, 0, DURATION); clock.pos = t;
+  if (clock.playing) { clock.t0 = performance.now(); if (engine && clock.sync) engine.startAt(t); }
+  if (!clock.playing) renderAt(t);
+  updateUI();
+}
+const fmt = t => { t = Math.max(0, Math.floor(t)); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); };
+
+// ---------------------------------------------------------------- UI wiring
+const ui = $('ui'), track = $('track'), fill = track.querySelector('.track-fill'), knob = track.querySelector('.track-knob');
+const marks = track.querySelector('.track-marks');
+[{ at: 0, title: '序' }].concat(CHAPTERS.map(c => ({ at: c.at, title: c.num + ' · ' + c.title }))).forEach(c => {
+  const m = document.createElement('button'); m.className = 'mark'; m.style.left = (c.at / DURATION * 100) + '%'; m.title = c.title; m.setAttribute('aria-label', '跳到 ' + c.title);
+  m.addEventListener('click', ev => { ev.stopPropagation(); seek(c.at + .01); poke(); });
+  const lab = document.createElement('span'); lab.textContent = c.title; m.appendChild(lab); marks.appendChild(m);
+});
+function updateUI() {
+  const T = now();
+  $('t-cur').textContent = fmt(T);
+  const p = T / DURATION * 100; fill.style.width = p + '%'; knob.style.left = p + '%';
+  track.setAttribute('aria-valuenow', Math.round(T)); track.setAttribute('aria-valuetext', fmt(T) + ' / 4:00');
+  $('b-play').classList.toggle('is-playing', clock.playing); $('b-play').setAttribute('aria-label', clock.playing ? '暂停' : '播放');
+}
+let hideTimer = 0;
+function poke() { ui.classList.remove('hide'); document.body.classList.remove('nocursor'); clearTimeout(hideTimer); hideTimer = setTimeout(() => { if (clock.playing && !ui.matches(':hover') && !ui.querySelector(':focus-visible')) { ui.classList.add('hide'); document.body.classList.add('nocursor'); } }, 2600); }
+window.addEventListener('pointermove', poke); window.addEventListener('pointerdown', poke);
+$('b-play').addEventListener('click', () => { clock.playing ? pause() : play(); poke(); });
+let tapRevealed = false;
+$('stage-hit').addEventListener('pointerdown', () => { tapRevealed = ui.classList.contains('hide'); });
+$('stage-hit').addEventListener('click', () => { if (!started) return; if (!tapRevealed) clock.playing ? pause() : play(); tapRevealed = false; poke(); });
+let muted = false;
+$('b-mute').addEventListener('click', () => { muted = !muted; if (engine) engine.setVolume(muted ? 0 : 1); $('b-mute').classList.toggle('is-muted', muted); $('b-mute').setAttribute('aria-label', muted ? '取消静音' : '静音'); poke(); });
+$('b-full').addEventListener('click', () => { const d = document; if (d.fullscreenElement) d.exitFullscreen().catch(() => { }); else (d.documentElement.requestFullscreen ? d.documentElement.requestFullscreen() : Promise.reject()).catch(() => { }); poke(); });
+let dragging = false;
+const seekFromEvent = ev => { const r = track.getBoundingClientRect(); seek((ev.clientX - r.left) / r.width * DURATION); };
+track.addEventListener('pointerdown', ev => { dragging = true; track.setPointerCapture(ev.pointerId); seekFromEvent(ev); });
+track.addEventListener('pointermove', ev => { if (dragging) seekFromEvent(ev); });
+track.addEventListener('pointerup', () => { dragging = false; });
+track.addEventListener('keydown', ev => { if (ev.key === 'ArrowRight') { seek(now() + 5); ev.preventDefault(); } if (ev.key === 'ArrowLeft') { seek(now() - 5); ev.preventDefault(); } });
+window.addEventListener('keydown', ev => {
+  if (!started || ev.target.closest && ev.target.closest('#track')) return;
+  if (ev.key === ' ' || ev.key === 'k') { ev.preventDefault(); clock.playing ? pause() : play(); }
+  else if (ev.key === 'ArrowRight') seek(now() + 5); else if (ev.key === 'ArrowLeft') seek(now() - 5);
+  else if (ev.key === 'f') $('b-full').click(); else if (ev.key === 'm') $('b-mute').click();
+  poke();
+});
+window.addEventListener('resize', () => { layout(); if (!clock.playing) renderAt(started ? now() : 205.5, { poster: !started }); });
+
+$('play-btn').addEventListener('click', async () => {
+  if (started || !R) return;
+  const btn = $('play-btn'), lab = btn.querySelector('span');
+  btn.disabled = true; lab.textContent = '调音中…';
+  try {
+    engine = new Engine(buildScore());
+    await engine.prepare(p => { lab.textContent = '调音中 ' + Math.round(p * 100) + '%'; });
+  } catch (e) { console.warn('audio unavailable', e); engine = null; }
+  started = true;
+  document.body.classList.add('started');
+  $('start').hidden = true;
+  clock.pos = 0; play(); poke();
+});
+
+// ---------------------------------------------------------------- loop
+let lastF = performance.now(), slow = 0, fast = 0;
+function frame() {
+  const t0 = performance.now(), dt = t0 - lastF; lastF = t0;
+  if (started) {
+    if (engine && clock.playing && clock.sync) engine.tick();
+    let T = now();
+    if (T >= DURATION) { clock.pos = DURATION; clock.playing = false; clock.sync = false; T = DURATION; ui.classList.remove('hide'); updateUI(); }
+    renderAt(T);
+    if (clock.playing) updateUI();
+    if (dt > 34) slow++; else slow = Math.max(0, slow - 1);
+    if (slow > 50 && quality > .56) { quality *= .86; slow = 0; layout(); }
+  }
+  requestAnimationFrame(frame);
+}
+setInterval(() => { if (engine && clock.playing && clock.sync) engine.tick(); }, 60);
+
+layout();
+if (R) {
+  if (TEST) {
+    started = true; $('start').hidden = true; ui.hidden = true;
+    window.__render = (t, poster) => { renderAt(t, { poster }); return true; };
+    window.__audio = { Engine, buildScore };
+    const t = parseFloat(QS.get('t') || '0'); clock.pos = t; renderAt(t);
+  } else {
+    renderAt(205.5, { poster: true });
+    requestAnimationFrame(frame);
+  }
+}
+updateUI();
+
+})();
+</script>
+
+</body>
+</html>
