@@ -8,7 +8,7 @@ const TEST = QS.has('test');
 const canvas = $('gl');
 const VIEW = { s: 1, ox: 0, oy: 0, css: 1 };
 const MET0 = new Float32Array(16).fill(-99);
-let R = null, quality = 1, engine = null, started = false;
+let R = null, quality = 1, engine = null, started = false, glLost = false;
 const lay = document.createElement('canvas'), emi = document.createElement('canvas');
 const g2 = lay.getContext('2d'), ge = emi.getContext('2d');
 
@@ -126,33 +126,50 @@ function updateText(T) {
 function hideText() { subEls.forEach(e => setO(e, 0)); setO(cardEl, 0); setO(titleEl, 0); setO(creditEl, 0); }
 
 // ---------------------------------------------------------------- clock + transport
+// The picture runs on its own wall clock, eased toward the audio clock while audio is healthy.
+// If the browser stalls the AudioContext (screen lock, call, headphones switching…), the
+// picture keeps going and the music rejoins at the right spot once audio wakes up.
 const clock = { playing: false, pos: 0, t0: 0, sync: false };
-function now() {
-  if (!clock.playing) return clock.pos;
-  if (engine && clock.sync) return engine.songTime();
-  return clock.pos + (performance.now() - clock.t0) / 1000;
-}
-async function play() {
-  if (clock.pos >= DURATION - .05) clock.pos = 0;
-  clock.playing = true; clock.t0 = performance.now(); clock.sync = false; updateUI();
-  if (engine) {
-    try { await engine.ctx.resume(); } catch (e) { }
-    if (!clock.playing) return;
-    clock.pos = now(); clock.t0 = performance.now();
-    engine.startAt(clock.pos); clock.sync = true;
+const AH = { lastCt: -1, lastWall: 0, ok: false, retry: 0 };
+function now() { return clock.playing ? clock.pos + (performance.now() - clock.t0) / 1000 : clock.pos; }
+function wakeAudio() { if (engine && engine.ctx.state !== 'running') engine.ctx.resume().catch(() => { }); }
+function syncAudio() {
+  if (!engine || !engine.ready || !clock.playing || !clock.sync) return;
+  const c = engine.ctx, w = performance.now();
+  if (c.state === 'running' && c.currentTime !== AH.lastCt) { AH.lastCt = c.currentTime; AH.lastWall = w; }
+  if (c.state === 'running' && w - AH.lastWall < 500) {
+    const T = now();
+    if (!AH.ok || T >= DURATION) { if (T < DURATION) engine.startAt(T); AH.ok = true; }
+    else { const d = engine.songTime() - T; if (Math.abs(d) > .4) engine.startAt(T); else clock.t0 -= d * 120; }
+    engine.tick(document.hidden ? 3 : .7);
+  } else {
+    if (AH.ok) { AH.ok = false; engine.stopAll(); }
+    if (w - AH.retry > 1000) { AH.retry = w; wakeAudio(); }
   }
+}
+function play() {
+  if (clock.pos >= DURATION - .05) clock.pos = 0;
+  clock.playing = true; clock.t0 = performance.now(); clock.sync = !!engine; AH.ok = false; AH.lastCt = -1;
+  wakeAudio(); updateUI(); showPaused();
   try { navigator.wakeLock && navigator.wakeLock.request('screen').catch(() => { }); } catch (e) { }
 }
 function pause() {
-  clock.pos = now(); clock.playing = false; clock.sync = false;
+  clock.pos = now(); clock.playing = false; clock.sync = false; AH.ok = false;
   if (engine) { engine.stopAll(); engine.ctx.suspend().catch(() => { }); }
-  updateUI();
+  updateUI(); showPaused();
 }
 function seek(t) {
-  t = clamp(t, 0, DURATION); clock.pos = t;
-  if (clock.playing) { clock.t0 = performance.now(); if (engine && clock.sync) engine.startAt(t); }
-  if (!clock.playing) renderAt(t);
+  t = clamp(t, 0, DURATION); clock.pos = t; clock.t0 = performance.now();
+  if (engine) { engine.prio = t; if (clock.playing && AH.ok) engine.startAt(t); }
+  if (!clock.playing) { safeRender(t); showPaused(); }
   updateUI();
+}
+const pausedEl = $('paused');
+function showPaused() {
+  if (!started || TEST) { pausedEl.hidden = true; return; }
+  const ended = !clock.playing && clock.pos >= DURATION - .05;
+  pausedEl.hidden = clock.playing;
+  pausedEl.querySelector('.p-label').textContent = ended ? '再看一次' : '已暂停 · 点按继续';
 }
 const fmt = t => { t = Math.max(0, Math.floor(t)); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); };
 
@@ -178,6 +195,8 @@ $('b-play').addEventListener('click', () => { clock.playing ? pause() : play(); 
 let tapRevealed = false;
 $('stage-hit').addEventListener('pointerdown', () => { tapRevealed = ui.classList.contains('hide'); });
 $('stage-hit').addEventListener('click', () => { if (!started) return; if (!tapRevealed) clock.playing ? pause() : play(); tapRevealed = false; poke(); });
+$('p-btn').addEventListener('click', () => { play(); poke(); });
+['pointerdown', 'keydown'].forEach(n => window.addEventListener(n, () => { if (clock.playing && !AH.ok) wakeAudio(); }));
 let muted = false;
 $('b-mute').addEventListener('click', () => { muted = !muted; if (engine) engine.setVolume(muted ? 0 : 1); $('b-mute').classList.toggle('is-muted', muted); $('b-mute').setAttribute('aria-label', muted ? '取消静音' : '静音'); poke(); });
 $('b-full').addEventListener('click', () => { const d = document; if (d.fullscreenElement) d.exitFullscreen().catch(() => { }); else (d.documentElement.requestFullscreen ? d.documentElement.requestFullscreen() : Promise.reject()).catch(() => { }); poke(); });
@@ -194,7 +213,13 @@ window.addEventListener('keydown', ev => {
   else if (ev.key === 'f') $('b-full').click(); else if (ev.key === 'm') $('b-mute').click();
   poke();
 });
-window.addEventListener('resize', () => { layout(); if (!clock.playing) renderAt(started ? now() : 205.5, { poster: !started }); });
+window.addEventListener('resize', () => { layout(); if (!clock.playing) safeRender(started ? now() : 205.5, { poster: !started }); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && clock.playing) wakeAudio(); });
+canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); glLost = true; });
+canvas.addEventListener('webglcontextrestored', () => {
+  try { R = new Renderer(canvas, TEST); layout(); glLost = false; if (!clock.playing) safeRender(started ? now() : 205.5, { poster: !started }); }
+  catch (e) { console.error(e); }
+});
 
 $('play-btn').addEventListener('click', async () => {
   if (started || !R) return;
@@ -202,7 +227,9 @@ $('play-btn').addEventListener('click', async () => {
   btn.disabled = true; lab.textContent = '调音中…';
   try {
     engine = new Engine(buildScore());
-    await engine.prepare(p => { lab.textContent = '调音中 ' + Math.round(p * 100) + '%'; });
+    engine.ctx.resume().catch(() => { });
+    try { const s = engine.ctx.createBufferSource(); s.buffer = engine.ctx.createBuffer(1, 1, engine.sr); s.connect(engine.ctx.destination); s.start(0); } catch (e) { }
+    await engine.prepare(p => { lab.textContent = '调音中 ' + Math.round(p * 100) + '%'; }, 9);
   } catch (e) { console.warn('audio unavailable', e); engine = null; }
   started = true;
   document.body.classList.add('started');
@@ -211,21 +238,23 @@ $('play-btn').addEventListener('click', async () => {
 });
 
 // ---------------------------------------------------------------- loop
-let lastF = performance.now(), slow = 0, fast = 0;
+let lastF = performance.now(), ema = 16, slowMs = 0, errCount = 0;
+function safeRender(T, opt) { if (!R || glLost) return; try { renderAt(T, opt); } catch (err) { if (errCount++ < 5) console.error(err); } }
 function frame() {
-  const t0 = performance.now(), dt = t0 - lastF; lastF = t0;
-  if (started) {
-    if (engine && clock.playing && clock.sync) engine.tick();
-    let T = now();
-    if (T >= DURATION) { clock.pos = DURATION; clock.playing = false; clock.sync = false; T = DURATION; ui.classList.remove('hide'); updateUI(); }
-    renderAt(T);
-    if (clock.playing) updateUI();
-    if (dt > 34) slow++; else slow = Math.max(0, slow - 1);
-    if (slow > 50 && quality > .56) { quality *= .86; slow = 0; layout(); }
-  }
   requestAnimationFrame(frame);
+  const t0 = performance.now(), dt = Math.min(250, t0 - lastF); lastF = t0;
+  if (!started) return;
+  syncAudio();
+  let T = now();
+  if (clock.playing && T >= DURATION) { clock.pos = DURATION; clock.playing = false; clock.sync = false; AH.ok = false; T = DURATION; ui.classList.remove('hide'); showPaused(); }
+  safeRender(T);
+  updateUI();
+  ema = ema * .92 + dt * .08;
+  if (clock.playing && ema > 40) slowMs += dt; else slowMs = Math.max(0, slowMs - dt);
+  if (slowMs > 1500 && quality > .5) { quality = Math.max(.5, quality * (ema > 90 ? .72 : .86)); slowMs = 0; ema = 30; layout(); }
 }
-setInterval(() => { if (engine && clock.playing && clock.sync) engine.tick(); }, 60);
+setInterval(syncAudio, 60);
+if (QS.has('debug')) window.__sm = { get engine() { return engine; }, now, get quality() { return quality; } };
 
 layout();
 if (R) {
@@ -235,7 +264,7 @@ if (R) {
     window.__audio = { Engine, buildScore };
     const t = parseFloat(QS.get('t') || '0'); clock.pos = t; renderAt(t);
   } else {
-    renderAt(205.5, { poster: true });
+    safeRender(205.5, { poster: true });
     requestAnimationFrame(frame);
   }
 }

@@ -324,21 +324,41 @@ class Engine {
     this.lfo = c.createOscillator(); this.lfo.frequency.value = 5.2; this.lfoG = c.createGain(); this.lfoG.gain.value = 4; this.lfo.connect(this.lfoG); this.lfo.start();
     this.active = new Set(); this.buf = {}; this.idx = 0; this.startPos = 0; this.base = 0; this.ready = false; this.vol = 1;
   }
-  async prepare(onProgress) {
+  // Synthesizes sample buffers. Jobs needed before `essential` seconds are awaited;
+  // the rest are built in the background, nearest-upcoming first (see `prio`).
+  async prepare(onProgress, essential = Infinity) {
     const c = this.ctx, sr = this.sr;
-    const jobs = [];
-    const need = {}; for (const e of this.E) if (['pno', 'mbox', 'gtr', 'hpsi', 'bell'].includes(e.i)) (need[e.i] = need[e.i] || new Set()).add(e.m);
     const fns = { pno: synthPiano, mbox: synthMbox, gtr: synthGtr, hpsi: synthHpsi, bell: synthBell };
-    for (const k in need) for (const m of need[k]) jobs.push(() => { this.buf[k + m] = this.mkBuf([fns[k](sr, m)]); });
-    jobs.push(() => { this.rev.buffer = this.mkIR(3.4); });
-    jobs.push(() => { this.noise = this.mkNoise(4, 'white'); this.pink = this.mkNoise(6, 'pink'); this.brown = this.mkNoise(6, 'brown'); });
-    jobs.push(() => { this.cricket = this.mkCrickets(4); this.shatterB = this.mkShatter(); });
-    for (let i = 0; i < jobs.length; i++) {
-      jobs[i]();
-      if (i % 3 === 2) { onProgress && onProgress(i / jobs.length); await new Promise(r => setTimeout(r, 0)); }
-    }
+    const first = {};
+    for (const e of this.E) if (fns[e.i]) { const k = e.i + e.m; if (!(k in first)) first[k] = { t: e.t, i: e.i, m: e.m }; }
+    const jobs = [
+      { t: -3, run: () => { this.rev.buffer = this.mkIR(3.4); } },
+      { t: -2, run: () => { this.noise = this.mkNoise(4, 'white'); this.pink = this.mkNoise(6, 'pink'); this.brown = this.mkNoise(6, 'brown'); } },
+      { t: 17, run: () => { this.cricket = this.mkCrickets(4); } },
+      { t: 160, run: () => { this.shatterB = this.mkShatter(); } },
+    ];
+    for (const k in first) { const f = first[k]; jobs.push({ t: f.t, run: () => { this.buf[k] = this.mkBuf([fns[f.i](sr, f.m)]); } }); }
+    jobs.sort((a, b) => a.t - b.t);
     this.org = c.createPeriodicWave(new Float32Array(10), new Float32Array([0, 1, .75, .1, .5, .05, .3, 0, .22, .1]));
+    this.jobs = jobs; this.prio = 0;
+    const ess = jobs.filter(j => j.t < essential);
+    for (let i = 0; i < ess.length; i++) {
+      ess[i].run(); ess[i].done = true;
+      if (i % 3 === 2) { onProgress && onProgress(i / ess.length); await new Promise(r => setTimeout(r, 0)); }
+    }
     this.ready = true; onProgress && onProgress(1);
+    this.allReady = this.background();
+    if (essential === Infinity) await this.allReady;
+  }
+  async background() {
+    for (;;) {
+      const left = this.jobs.filter(j => !j.done); if (!left.length) return;
+      const p = this.prio, key = j => j.t >= p - 3 ? j.t - p : 1e6 - j.t;
+      let best = left[0]; for (const j of left) if (key(j) < key(best)) best = j;
+      try { best.run(); } catch (e) { console.warn(e); }
+      best.done = true;
+      await new Promise(r => setTimeout(r, 0));
+    }
   }
   mkBuf(chs) { const b = this.ctx.createBuffer(chs.length, chs[0].length, this.sr); chs.forEach((d, i) => b.copyToChannel(d, i)); return b; }
   mkIR(sec) {
@@ -398,15 +418,15 @@ class Engine {
   track(n) { this.active.add(n); n.onended = () => this.active.delete(n); }
   startAt(pos) {
     this.stopAll(); const c = this.ctx;
-    this.startPos = pos; this.base = c.currentTime + .06;
+    this.startPos = pos; this.base = c.currentTime + .06; this.prio = pos;
     let lo = 0, hi = this.E.length; while (lo < hi) { const m = (lo + hi) >> 1; if (this.E[m].t < pos) lo = m + 1; else hi = m; }
     this.idx = lo;
     for (let i = 0; i < lo; i++) { const e = this.E[i]; if (LONG.has(e.i) && e.t + e.d > pos + .4) this.play(e, this.base, pos - e.t); }
     this.tick();
   }
-  tick() {
+  tick(look = .6) {
     if (!this.ready) return;
-    const c = this.ctx, now = this.songTime(), until = now + .6;
+    const c = this.ctx, now = this.songTime(), until = now + look;
     while (this.idx < this.E.length && this.E[this.idx].t < until) {
       const e = this.E[this.idx++];
       if (e.t < now - .08) continue;
@@ -427,7 +447,8 @@ class Engine {
   noiseSrc(buf, when, loop = false, off = 0) { const s = this.ctx.createBufferSource(); s.buffer = buf; s.loop = loop; s.start(when, off % buf.duration); this.track(s); return s; }
   filt(type, f, q = .7) { const b = this.ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; return b; }
   chain(...nodes) { for (let i = 0; i < nodes.length - 1; i++) nodes[i].connect(nodes[i + 1]); return nodes[nodes.length - 1]; }
-  play(e, when, off) {
+  play(e, when, off) { try { this._play(e, when, off); } catch (err) { /* a missing buffer must never stop playback */ } }
+  _play(e, when, off) {
     const c = this.ctx, v = e.v;
     switch (e.i) {
       case 'pno': this.sample('pno' + e.m, 'pno', when, e.d, v * 1.1, off, .35); break;

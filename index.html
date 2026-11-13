@@ -89,6 +89,15 @@ body.nocursor { cursor: none; }
 .s-play:disabled { cursor: progress; opacity: .8; }
 .s-note { margin: 4px 0 0; font: 400 13px/1.7 var(--ui); color: var(--mist); max-width: 30em; }
 
+/* paused / ended */
+.paused { position: fixed; inset: 0; z-index: 3; display: grid; place-items: center; pointer-events: none; background: radial-gradient(ellipse at center, rgba(3, 4, 8, .62), rgba(3, 4, 8, .28) 60%); }
+.paused button { pointer-events: auto; display: flex; flex-direction: column; align-items: center; gap: 16px; background: none; border: 0; color: var(--paper); cursor: pointer;
+  font: 500 15px/1 var(--display); letter-spacing: .32em; padding: 12px; text-shadow: 0 1px 8px rgba(0, 0, 0, .8); }
+.paused .ring { width: 84px; height: 84px; border-radius: 50%; border: 1px solid rgba(239, 233, 223, .6); background: rgba(5, 6, 10, .45); display: grid; place-items: center; transition: border-color .3s; }
+.paused svg { width: 26px; height: 26px; fill: currentColor; margin-left: 4px; }
+.paused button:hover .ring { border-color: var(--gilt); }
+.paused button:focus-visible { outline: 2px solid var(--gilt); outline-offset: 4px; border-radius: 4px; }
+
 /* controls */
 .ui { position: fixed; left: 0; right: 0; bottom: 0; z-index: 4; display: flex; align-items: center; gap: 12px;
   padding-block: 18px calc(12px + env(safe-area-inset-bottom, 0px));
@@ -145,6 +154,9 @@ body:not(.started) .ui { display: none; }
   </div>
 </section>
 
+<div id="paused" class="paused" hidden>
+  <button id="p-btn" type="button"><span class="ring"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 3l12 7-12 7z"/></svg></span><span class="p-label">已暂停 · 点按继续</span></button>
+</div>
 <div id="ui" class="ui">
   <button id="b-play" type="button" aria-label="暂停">
     <svg class="i-play" viewBox="0 0 20 20" aria-hidden="true"><path d="M5 3l12 7-12 7z"/></svg>
@@ -491,21 +503,41 @@ class Engine {
     this.lfo = c.createOscillator(); this.lfo.frequency.value = 5.2; this.lfoG = c.createGain(); this.lfoG.gain.value = 4; this.lfo.connect(this.lfoG); this.lfo.start();
     this.active = new Set(); this.buf = {}; this.idx = 0; this.startPos = 0; this.base = 0; this.ready = false; this.vol = 1;
   }
-  async prepare(onProgress) {
+  // Synthesizes sample buffers. Jobs needed before `essential` seconds are awaited;
+  // the rest are built in the background, nearest-upcoming first (see `prio`).
+  async prepare(onProgress, essential = Infinity) {
     const c = this.ctx, sr = this.sr;
-    const jobs = [];
-    const need = {}; for (const e of this.E) if (['pno', 'mbox', 'gtr', 'hpsi', 'bell'].includes(e.i)) (need[e.i] = need[e.i] || new Set()).add(e.m);
     const fns = { pno: synthPiano, mbox: synthMbox, gtr: synthGtr, hpsi: synthHpsi, bell: synthBell };
-    for (const k in need) for (const m of need[k]) jobs.push(() => { this.buf[k + m] = this.mkBuf([fns[k](sr, m)]); });
-    jobs.push(() => { this.rev.buffer = this.mkIR(3.4); });
-    jobs.push(() => { this.noise = this.mkNoise(4, 'white'); this.pink = this.mkNoise(6, 'pink'); this.brown = this.mkNoise(6, 'brown'); });
-    jobs.push(() => { this.cricket = this.mkCrickets(4); this.shatterB = this.mkShatter(); });
-    for (let i = 0; i < jobs.length; i++) {
-      jobs[i]();
-      if (i % 3 === 2) { onProgress && onProgress(i / jobs.length); await new Promise(r => setTimeout(r, 0)); }
-    }
+    const first = {};
+    for (const e of this.E) if (fns[e.i]) { const k = e.i + e.m; if (!(k in first)) first[k] = { t: e.t, i: e.i, m: e.m }; }
+    const jobs = [
+      { t: -3, run: () => { this.rev.buffer = this.mkIR(3.4); } },
+      { t: -2, run: () => { this.noise = this.mkNoise(4, 'white'); this.pink = this.mkNoise(6, 'pink'); this.brown = this.mkNoise(6, 'brown'); } },
+      { t: 17, run: () => { this.cricket = this.mkCrickets(4); } },
+      { t: 160, run: () => { this.shatterB = this.mkShatter(); } },
+    ];
+    for (const k in first) { const f = first[k]; jobs.push({ t: f.t, run: () => { this.buf[k] = this.mkBuf([fns[f.i](sr, f.m)]); } }); }
+    jobs.sort((a, b) => a.t - b.t);
     this.org = c.createPeriodicWave(new Float32Array(10), new Float32Array([0, 1, .75, .1, .5, .05, .3, 0, .22, .1]));
+    this.jobs = jobs; this.prio = 0;
+    const ess = jobs.filter(j => j.t < essential);
+    for (let i = 0; i < ess.length; i++) {
+      ess[i].run(); ess[i].done = true;
+      if (i % 3 === 2) { onProgress && onProgress(i / ess.length); await new Promise(r => setTimeout(r, 0)); }
+    }
     this.ready = true; onProgress && onProgress(1);
+    this.allReady = this.background();
+    if (essential === Infinity) await this.allReady;
+  }
+  async background() {
+    for (;;) {
+      const left = this.jobs.filter(j => !j.done); if (!left.length) return;
+      const p = this.prio, key = j => j.t >= p - 3 ? j.t - p : 1e6 - j.t;
+      let best = left[0]; for (const j of left) if (key(j) < key(best)) best = j;
+      try { best.run(); } catch (e) { console.warn(e); }
+      best.done = true;
+      await new Promise(r => setTimeout(r, 0));
+    }
   }
   mkBuf(chs) { const b = this.ctx.createBuffer(chs.length, chs[0].length, this.sr); chs.forEach((d, i) => b.copyToChannel(d, i)); return b; }
   mkIR(sec) {
@@ -565,15 +597,15 @@ class Engine {
   track(n) { this.active.add(n); n.onended = () => this.active.delete(n); }
   startAt(pos) {
     this.stopAll(); const c = this.ctx;
-    this.startPos = pos; this.base = c.currentTime + .06;
+    this.startPos = pos; this.base = c.currentTime + .06; this.prio = pos;
     let lo = 0, hi = this.E.length; while (lo < hi) { const m = (lo + hi) >> 1; if (this.E[m].t < pos) lo = m + 1; else hi = m; }
     this.idx = lo;
     for (let i = 0; i < lo; i++) { const e = this.E[i]; if (LONG.has(e.i) && e.t + e.d > pos + .4) this.play(e, this.base, pos - e.t); }
     this.tick();
   }
-  tick() {
+  tick(look = .6) {
     if (!this.ready) return;
-    const c = this.ctx, now = this.songTime(), until = now + .6;
+    const c = this.ctx, now = this.songTime(), until = now + look;
     while (this.idx < this.E.length && this.E[this.idx].t < until) {
       const e = this.E[this.idx++];
       if (e.t < now - .08) continue;
@@ -594,7 +626,8 @@ class Engine {
   noiseSrc(buf, when, loop = false, off = 0) { const s = this.ctx.createBufferSource(); s.buffer = buf; s.loop = loop; s.start(when, off % buf.duration); this.track(s); return s; }
   filt(type, f, q = .7) { const b = this.ctx.createBiquadFilter(); b.type = type; b.frequency.value = f; b.Q.value = q; return b; }
   chain(...nodes) { for (let i = 0; i < nodes.length - 1; i++) nodes[i].connect(nodes[i + 1]); return nodes[nodes.length - 1]; }
-  play(e, when, off) {
+  play(e, when, off) { try { this._play(e, when, off); } catch (err) { /* a missing buffer must never stop playback */ } }
+  _play(e, when, off) {
     const c = this.ctx, v = e.v;
     switch (e.i) {
       case 'pno': this.sample('pno' + e.m, 'pno', when, e.d, v * 1.1, off, .35); break;
@@ -2298,7 +2331,7 @@ const TEST = QS.has('test');
 const canvas = $('gl');
 const VIEW = { s: 1, ox: 0, oy: 0, css: 1 };
 const MET0 = new Float32Array(16).fill(-99);
-let R = null, quality = 1, engine = null, started = false;
+let R = null, quality = 1, engine = null, started = false, glLost = false;
 const lay = document.createElement('canvas'), emi = document.createElement('canvas');
 const g2 = lay.getContext('2d'), ge = emi.getContext('2d');
 
@@ -2416,33 +2449,50 @@ function updateText(T) {
 function hideText() { subEls.forEach(e => setO(e, 0)); setO(cardEl, 0); setO(titleEl, 0); setO(creditEl, 0); }
 
 // ---------------------------------------------------------------- clock + transport
+// The picture runs on its own wall clock, eased toward the audio clock while audio is healthy.
+// If the browser stalls the AudioContext (screen lock, call, headphones switching…), the
+// picture keeps going and the music rejoins at the right spot once audio wakes up.
 const clock = { playing: false, pos: 0, t0: 0, sync: false };
-function now() {
-  if (!clock.playing) return clock.pos;
-  if (engine && clock.sync) return engine.songTime();
-  return clock.pos + (performance.now() - clock.t0) / 1000;
-}
-async function play() {
-  if (clock.pos >= DURATION - .05) clock.pos = 0;
-  clock.playing = true; clock.t0 = performance.now(); clock.sync = false; updateUI();
-  if (engine) {
-    try { await engine.ctx.resume(); } catch (e) { }
-    if (!clock.playing) return;
-    clock.pos = now(); clock.t0 = performance.now();
-    engine.startAt(clock.pos); clock.sync = true;
+const AH = { lastCt: -1, lastWall: 0, ok: false, retry: 0 };
+function now() { return clock.playing ? clock.pos + (performance.now() - clock.t0) / 1000 : clock.pos; }
+function wakeAudio() { if (engine && engine.ctx.state !== 'running') engine.ctx.resume().catch(() => { }); }
+function syncAudio() {
+  if (!engine || !engine.ready || !clock.playing || !clock.sync) return;
+  const c = engine.ctx, w = performance.now();
+  if (c.state === 'running' && c.currentTime !== AH.lastCt) { AH.lastCt = c.currentTime; AH.lastWall = w; }
+  if (c.state === 'running' && w - AH.lastWall < 500) {
+    const T = now();
+    if (!AH.ok || T >= DURATION) { if (T < DURATION) engine.startAt(T); AH.ok = true; }
+    else { const d = engine.songTime() - T; if (Math.abs(d) > .4) engine.startAt(T); else clock.t0 -= d * 120; }
+    engine.tick(document.hidden ? 3 : .7);
+  } else {
+    if (AH.ok) { AH.ok = false; engine.stopAll(); }
+    if (w - AH.retry > 1000) { AH.retry = w; wakeAudio(); }
   }
+}
+function play() {
+  if (clock.pos >= DURATION - .05) clock.pos = 0;
+  clock.playing = true; clock.t0 = performance.now(); clock.sync = !!engine; AH.ok = false; AH.lastCt = -1;
+  wakeAudio(); updateUI(); showPaused();
   try { navigator.wakeLock && navigator.wakeLock.request('screen').catch(() => { }); } catch (e) { }
 }
 function pause() {
-  clock.pos = now(); clock.playing = false; clock.sync = false;
+  clock.pos = now(); clock.playing = false; clock.sync = false; AH.ok = false;
   if (engine) { engine.stopAll(); engine.ctx.suspend().catch(() => { }); }
-  updateUI();
+  updateUI(); showPaused();
 }
 function seek(t) {
-  t = clamp(t, 0, DURATION); clock.pos = t;
-  if (clock.playing) { clock.t0 = performance.now(); if (engine && clock.sync) engine.startAt(t); }
-  if (!clock.playing) renderAt(t);
+  t = clamp(t, 0, DURATION); clock.pos = t; clock.t0 = performance.now();
+  if (engine) { engine.prio = t; if (clock.playing && AH.ok) engine.startAt(t); }
+  if (!clock.playing) { safeRender(t); showPaused(); }
   updateUI();
+}
+const pausedEl = $('paused');
+function showPaused() {
+  if (!started || TEST) { pausedEl.hidden = true; return; }
+  const ended = !clock.playing && clock.pos >= DURATION - .05;
+  pausedEl.hidden = clock.playing;
+  pausedEl.querySelector('.p-label').textContent = ended ? '再看一次' : '已暂停 · 点按继续';
 }
 const fmt = t => { t = Math.max(0, Math.floor(t)); return Math.floor(t / 60) + ':' + String(t % 60).padStart(2, '0'); };
 
@@ -2468,6 +2518,8 @@ $('b-play').addEventListener('click', () => { clock.playing ? pause() : play(); 
 let tapRevealed = false;
 $('stage-hit').addEventListener('pointerdown', () => { tapRevealed = ui.classList.contains('hide'); });
 $('stage-hit').addEventListener('click', () => { if (!started) return; if (!tapRevealed) clock.playing ? pause() : play(); tapRevealed = false; poke(); });
+$('p-btn').addEventListener('click', () => { play(); poke(); });
+['pointerdown', 'keydown'].forEach(n => window.addEventListener(n, () => { if (clock.playing && !AH.ok) wakeAudio(); }));
 let muted = false;
 $('b-mute').addEventListener('click', () => { muted = !muted; if (engine) engine.setVolume(muted ? 0 : 1); $('b-mute').classList.toggle('is-muted', muted); $('b-mute').setAttribute('aria-label', muted ? '取消静音' : '静音'); poke(); });
 $('b-full').addEventListener('click', () => { const d = document; if (d.fullscreenElement) d.exitFullscreen().catch(() => { }); else (d.documentElement.requestFullscreen ? d.documentElement.requestFullscreen() : Promise.reject()).catch(() => { }); poke(); });
@@ -2484,7 +2536,13 @@ window.addEventListener('keydown', ev => {
   else if (ev.key === 'f') $('b-full').click(); else if (ev.key === 'm') $('b-mute').click();
   poke();
 });
-window.addEventListener('resize', () => { layout(); if (!clock.playing) renderAt(started ? now() : 205.5, { poster: !started }); });
+window.addEventListener('resize', () => { layout(); if (!clock.playing) safeRender(started ? now() : 205.5, { poster: !started }); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && clock.playing) wakeAudio(); });
+canvas.addEventListener('webglcontextlost', e => { e.preventDefault(); glLost = true; });
+canvas.addEventListener('webglcontextrestored', () => {
+  try { R = new Renderer(canvas, TEST); layout(); glLost = false; if (!clock.playing) safeRender(started ? now() : 205.5, { poster: !started }); }
+  catch (e) { console.error(e); }
+});
 
 $('play-btn').addEventListener('click', async () => {
   if (started || !R) return;
@@ -2492,7 +2550,9 @@ $('play-btn').addEventListener('click', async () => {
   btn.disabled = true; lab.textContent = '调音中…';
   try {
     engine = new Engine(buildScore());
-    await engine.prepare(p => { lab.textContent = '调音中 ' + Math.round(p * 100) + '%'; });
+    engine.ctx.resume().catch(() => { });
+    try { const s = engine.ctx.createBufferSource(); s.buffer = engine.ctx.createBuffer(1, 1, engine.sr); s.connect(engine.ctx.destination); s.start(0); } catch (e) { }
+    await engine.prepare(p => { lab.textContent = '调音中 ' + Math.round(p * 100) + '%'; }, 9);
   } catch (e) { console.warn('audio unavailable', e); engine = null; }
   started = true;
   document.body.classList.add('started');
@@ -2501,21 +2561,23 @@ $('play-btn').addEventListener('click', async () => {
 });
 
 // ---------------------------------------------------------------- loop
-let lastF = performance.now(), slow = 0, fast = 0;
+let lastF = performance.now(), ema = 16, slowMs = 0, errCount = 0;
+function safeRender(T, opt) { if (!R || glLost) return; try { renderAt(T, opt); } catch (err) { if (errCount++ < 5) console.error(err); } }
 function frame() {
-  const t0 = performance.now(), dt = t0 - lastF; lastF = t0;
-  if (started) {
-    if (engine && clock.playing && clock.sync) engine.tick();
-    let T = now();
-    if (T >= DURATION) { clock.pos = DURATION; clock.playing = false; clock.sync = false; T = DURATION; ui.classList.remove('hide'); updateUI(); }
-    renderAt(T);
-    if (clock.playing) updateUI();
-    if (dt > 34) slow++; else slow = Math.max(0, slow - 1);
-    if (slow > 50 && quality > .56) { quality *= .86; slow = 0; layout(); }
-  }
   requestAnimationFrame(frame);
+  const t0 = performance.now(), dt = Math.min(250, t0 - lastF); lastF = t0;
+  if (!started) return;
+  syncAudio();
+  let T = now();
+  if (clock.playing && T >= DURATION) { clock.pos = DURATION; clock.playing = false; clock.sync = false; AH.ok = false; T = DURATION; ui.classList.remove('hide'); showPaused(); }
+  safeRender(T);
+  updateUI();
+  ema = ema * .92 + dt * .08;
+  if (clock.playing && ema > 40) slowMs += dt; else slowMs = Math.max(0, slowMs - dt);
+  if (slowMs > 1500 && quality > .5) { quality = Math.max(.5, quality * (ema > 90 ? .72 : .86)); slowMs = 0; ema = 30; layout(); }
 }
-setInterval(() => { if (engine && clock.playing && clock.sync) engine.tick(); }, 60);
+setInterval(syncAudio, 60);
+if (QS.has('debug')) window.__sm = { get engine() { return engine; }, now, get quality() { return quality; } };
 
 layout();
 if (R) {
@@ -2525,7 +2587,7 @@ if (R) {
     window.__audio = { Engine, buildScore };
     const t = parseFloat(QS.get('t') || '0'); clock.pos = t; renderAt(t);
   } else {
-    renderAt(205.5, { poster: true });
+    safeRender(205.5, { poster: true });
     requestAnimationFrame(frame);
   }
 }
