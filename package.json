@@ -1,0 +1,17 @@
+{
+  "name": "graham-number-film",
+  "version": "1.0.0",
+  "private": true,
+  "description": "葛立恒数有多大，又有多小 —— 一部用 WebGL 实时渲染的科普短片",
+  "scripts": {
+    "serve": "npx http-server -p 8080 -c-1 .",
+    "build": "node tools/build.cjs",
+    "render": "node tools/render.cjs",
+    "data": "python3 tools/gen_data.py",
+    "fonts": "python3 tools/fetch_fonts.py",
+    "verify": "python3 tools/verify_numbers.py"
+  },
+  "devDependencies": {
+    "playwright": "^1.48.0"
+  }
+}

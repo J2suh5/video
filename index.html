@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>葛立恒数有多大，又有多小</title>
+<meta name="description" content="一部用 WebGL 实时渲染的科普短片：从高德纳箭头到 g64，再到无穷。">
+<link rel="stylesheet" href="src/fonts.css">
+<link rel="stylesheet" href="src/style.css">
+</head>
+<body>
+<div id="app">
+  <div id="frame">
+    <canvas id="gl" aria-label="葛立恒数科普动画"></canvas>
+    <div id="ov"></div>
+
+    <div id="poster" hidden>
+      <button id="btn-big" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 4.5v15l13-7.5z"/></svg>
+        播放影片
+      </button>
+      <div class="hint">时长 5 分 20 秒 · 配乐实时合成，建议打开声音 · 空格键播放 / 暂停</div>
+    </div>
+
+    <div id="controls">
+      <div class="track">
+        <div class="rail"></div>
+        <div id="seek-fill"></div>
+        <input id="seek" type="range" min="0" max="320" step="0.01" value="0" aria-label="播放进度">
+        <div id="marks"></div>
+      </div>
+      <div class="bar">
+        <button id="btn-play" class="icon" type="button" aria-label="播放">
+          <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M7 4.5v15l13-7.5z"/></svg>
+          <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 4.5h4v15H6zM14 4.5h4v15h-4z"/></svg>
+        </button>
+        <span id="time">00:00 / 05:20</span>
+        <span id="chapter"></span>
+        <span class="spacer"></span>
+        <button id="btn-q" type="button" aria-label="切换画质">高清</button>
+        <button id="btn-cc" class="icon" type="button" aria-label="字幕" aria-pressed="true">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path class="on-only" fill="currentColor" d="M6 11h5v1.6H6zM13 11h5v1.6h-5zM6 14.4h8v1.6H6z"/><path class="off-only" stroke="currentColor" stroke-width="1.6" d="M5 18 19 6"/></svg>
+        </button>
+        <button id="btn-mute" class="icon" type="button" aria-label="静音" aria-pressed="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 9h4l5-4v14l-5-4H4z"/><path class="on-only" fill="none" stroke="currentColor" stroke-width="1.6" d="M16 8.5a5 5 0 0 1 0 7M18.5 6a8.5 8.5 0 0 1 0 12"/><path class="off-only" stroke="currentColor" stroke-width="1.6" d="M16 9l5 6M21 9l-5 6"/></svg>
+        </button>
+        <button id="btn-fs" class="icon" type="button" aria-label="全屏">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div id="loading">正在生成粒子……</div>
+    <div id="error" hidden><p></p></div>
+  </div>
+</div>
+<script src="src/data.js"></script>
+<script src="src/engine.js"></script>
+<script src="src/shapes.js"></script>
+<script src="src/scenes.js"></script>
+<script src="src/audio.js"></script>
+<script src="src/main.js"></script>
+</body>
+</html>
