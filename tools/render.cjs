@@ -4,10 +4,11 @@
 
      node tools/render.cjs                         # 全片，30fps，3 个进程并行
      node tools/render.cjs --from 60 --to 80       # 只渲染一段（调试用）
-     node tools/render.cjs --workers 4 --fps 30 --crf 20 --out dist/graham-number.mp4
+     node tools/render.cjs --workers 4 --fps 30 --crf 24 --out dist/graham-number.mp4
 
    原理：页面以 ?render 模式打开后暴露 window.__frame(t)，画面只依赖时间 t，
-   因此可以把时间轴切成若干段，交给多个浏览器进程并行渲染，再无损拼接。
+   因此可以把时间轴切成若干段，交给多个浏览器进程并行渲染成近无损的中间片段，
+   最后统一做一次轻度降噪 + 限码率的成片编码（星空、粒子和数字隧道细节极多，不限码率会非常大）。
    配乐由同一份乐谱经 OfflineAudioContext 离线合成。
    ========================================================================== */
 const { spawn } = require('child_process');
@@ -23,7 +24,7 @@ const FPS = +arg('fps', 30);
 const FROM = +arg('from', 0);
 const TO = +arg('to', 320);
 const WORKERS = +arg('workers', 3);
-const CRF = arg('crf', '20');
+const CRF = arg('crf', '24');
 const OUT = path.resolve(ROOT, arg('out', 'dist/graham-number.mp4'));
 const TMP = path.resolve(arg('tmp', path.join(os.tmpdir(), 'graham-render')));
 // 有独立显卡的机器可以设 GPU=1 使用硬件渲染；默认用 SwiftShader 软件渲染，结果在任何机器上都一致
@@ -49,7 +50,7 @@ async function openPage() {
 async function worker(f0, f1, seg, id) {
   const { browser, page } = await openPage();
   const ff = spawn('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', '-',
-    '-c:v', 'libx264', '-preset', 'slow', '-crf', CRF, '-pix_fmt', 'yuv420p', '-g', String(FPS * 4), '-r', String(FPS), seg],
+    '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '14', '-pix_fmt', 'yuv420p', '-g', String(FPS * 4), '-r', String(FPS), seg],
   { stdio: ['pipe', 'inherit', 'inherit'] });
   const done = new Promise((res, rej) => ff.on('exit', (c) => (c === 0 ? res() : rej(new Error('ffmpeg ' + c)))));
   const t0 = Date.now();
@@ -107,7 +108,8 @@ async function main() {
   const video = path.join(TMP, 'video.mp4');
   await run('ffmpeg', ['-loglevel', 'error', '-y', '-f', 'concat', '-safe', '0', '-i', list, '-c', 'copy', video]);
   await run('ffmpeg', ['-loglevel', 'error', '-y', '-i', video, '-ss', String(FROM), '-t', String(TO - FROM), '-i', wav,
-    '-map', '0:v', '-map', '1:a', '-c:v', 'copy', '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11', '-c:a', 'aac', '-b:a', '192k',
+    '-map', '0:v', '-map', '1:a', '-vf', 'hqdn3d=1.5:1.5:4:4', '-c:v', 'libx264', '-preset', 'slow', '-crf', CRF,
+    '-maxrate', '7M', '-bufsize', '14M', '-pix_fmt', 'yuv420p', '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11', '-c:a', 'aac', '-b:a', '192k',
     '-ar', '48000', '-shortest', '-movflags', '+faststart', OUT]);
   console.log(`完成：${path.relative(ROOT, OUT)}  ${(fs.statSync(OUT).size / 1048576).toFixed(1)} MB，用时 ${((Date.now() - t0) / 60000).toFixed(1)} 分钟`);
 }

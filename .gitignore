@@ -1,2 +1,4 @@
 node_modules/
 *.log
+# 导出的 1080p 成片体积较大，不纳入仓库
+dist/graham-number.mp4

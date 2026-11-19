@@ -11,7 +11,8 @@
 | --- | --- |
 | 直接打开 `index.html` | 双击即可，无需服务器、无需联网。点「播放影片」开始（配乐由浏览器实时合成）。 |
 | `dist/graham-number.html` | 所有代码、字体、数据都内联在这一个文件里（约 650 KB），方便分享。 |
-| `dist/graham-number.mp4` | 1920×1080 · 30fps · 含配乐，由 `tools/render.cjs` 逐帧渲染得到。 |
+| `dist/graham-number-720p.mp4` | 成片预览（1280×720 · 30fps · 含配乐，约 45 MB）。 |
+| `npm run render` | 在本机逐帧导出 1920×1080 · 30fps 成片到 `dist/graham-number.mp4`（体积较大，未纳入仓库）。 |
 
 播放器快捷键：`空格` 播放 / 暂停 · `←` `→` 快退 / 快进 5 秒 · `F` 全屏 · `M` 静音 · `C` 字幕。地址后加 `?t=秒数` 可从指定时间开始，例如 `index.html?t=193`。
 
@@ -70,7 +71,7 @@ python3 tools/gen_data.py         # 重新生成 src/data.js
 ```bash
 npm install                      # 只需要 playwright（导出视频用）
 npm run build                    # 生成单文件 dist/graham-number.html
-npm run render                   # 生成 dist/graham-number.mp4（需要 ffmpeg）
+npm run render                   # 生成 1080p 的 dist/graham-number.mp4（需要 ffmpeg，约 30 分钟）
 npm run render -- --from 117 --to 151 --out dist/tower.mp4   # 只导出一段
 python3 tools/fetch_fonts.py     # 修改文案后重新子集化字体
 ```
